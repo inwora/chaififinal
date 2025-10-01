@@ -323,12 +323,12 @@ export default function DashboardPage() {
 
 
   return (
-    <div className="min-h-screen bg-background px-3 py-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background px-2 py-3 sm:px-4 lg:px-6">
       <div className="max-w-7xl mx-auto">
         {/* Header Section */}
-        <div className="flex flex-col gap-4 mb-6 sm:mb-8">
+        <div className="flex flex-col gap-3 mb-4 sm:mb-6">
           {/* Title and Navigation Row */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-center gap-3">
               <Button
                 onClick={() => navigate("/menu")}
@@ -388,13 +388,13 @@ export default function DashboardPage() {
           </div>
 
           {/* Period Selection Buttons */}
-          <div className="flex flex-wrap justify-center gap-2 sm:justify-start sm:gap-3">
+          <div className="flex flex-wrap justify-center gap-1 sm:justify-start sm:gap-2">
             <Button
               variant={selectedPeriod === "today" ? "default" : "secondary"}
               onClick={() => setSelectedPeriod("today")}
               data-testid="button-period-today"
               size="sm"
-              className="px-3 py-2 text-sm min-w-[80px] sm:min-w-[100px]"
+              className="px-2 py-1 text-xs min-w-[70px] sm:min-w-[80px] sm:px-3 sm:py-2 sm:text-sm"
             >
               Today
             </Button>
@@ -403,7 +403,7 @@ export default function DashboardPage() {
               onClick={() => setSelectedPeriod("week")}
               data-testid="button-period-week"
               size="sm"
-              className="px-3 py-2 text-sm min-w-[80px] sm:min-w-[100px]"
+              className="px-2 py-1 text-xs min-w-[70px] sm:min-w-[80px] sm:px-3 sm:py-2 sm:text-sm"
             >
               Week
             </Button>
@@ -412,21 +412,21 @@ export default function DashboardPage() {
               onClick={() => setSelectedPeriod("month")}
               data-testid="button-period-month"
               size="sm"
-              className="px-3 py-2 text-sm min-w-[80px] sm:min-w-[100px]"
+              className="px-2 py-1 text-xs min-w-[70px] sm:min-w-[80px] sm:px-3 sm:py-2 sm:text-sm"
             >
               Month
             </Button>
           </div>
 
           {/* Date-based Actions */}
-          <div className="flex flex-wrap justify-center gap-2 sm:justify-start sm:gap-3 mt-4">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap justify-center gap-1 sm:justify-start sm:gap-2 mt-3">
+            <div className="flex items-center gap-1">
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     size="sm"
-                    className={`px-3 py-2 text-sm justify-start text-left font-normal date-picker-button ${
+                    className={`px-2 py-1 text-xs justify-start text-left font-normal date-picker-button sm:px-3 sm:py-2 sm:text-sm ${
                       selectedDate ? "text-foreground bg-blue-50 border-blue-200 hover:bg-blue-100" : "text-muted-foreground"
                     }`}
                     data-selected={selectedDate ? "true" : "false"}
@@ -449,11 +449,12 @@ export default function DashboardPage() {
               <Button
                 onClick={handleDownloadDailyByDate}
                 size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 text-sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 text-xs sm:px-3 sm:py-2 sm:text-sm"
                 disabled={!selectedDate}
               >
-                <Download className="mr-2 h-4 w-4" />
-                Download Daily Summary PDF
+                <Download className="mr-1 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4" />
+                <span className="hidden xs:inline">Download Daily Summary PDF</span>
+                <span className="xs:hidden">Download</span>
               </Button>
               
               <AlertDialog>
@@ -461,11 +462,12 @@ export default function DashboardPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-red-600 border-red-200 hover:bg-red-50 px-3 py-2 text-sm"
+                    className="text-red-600 border-red-200 hover:bg-red-50 px-2 py-1 text-xs sm:px-3 sm:py-2 sm:text-sm"
                     disabled={!selectedDate}
                   >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete Daily Summary
+                    <Trash2 className="mr-1 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4" />
+                    <span className="hidden xs:inline">Delete Daily Summary</span>
+                    <span className="xs:hidden">Delete</span>
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent className="w-[95vw] max-w-lg mx-2">
@@ -488,68 +490,68 @@ export default function DashboardPage() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4 mb-4 sm:mb-6">
           <Card>
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <IndianRupee className="text-primary text-lg sm:text-xl" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <IndianRupee className="text-primary text-base sm:text-lg" />
                 </div>
-                <span className="text-xs sm:text-sm text-muted-foreground" data-testid="text-today-label">Today</span>
+                <span className="text-xs text-muted-foreground" data-testid="text-today-label">Today</span>
               </div>
-              <div className="text-xl sm:text-2xl font-bold text-secondary mb-1" data-testid="text-daily-total">
+              <div className="text-lg sm:text-xl font-bold text-secondary mb-1" data-testid="text-daily-total">
                 ₹{todaySummary?.totalAmount || "0.00"}
               </div>
-              <div className="text-xs sm:text-sm text-green-600" data-testid="text-daily-growth">+0% from yesterday</div>
+              <div className="text-xs text-green-600" data-testid="text-daily-growth">+0% from yesterday</div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-500/10 rounded-lg flex items-center justify-center">
-                  <span className="text-green-600 text-lg sm:text-xl font-bold">G</span>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-500/10 rounded-lg flex items-center justify-center">
+                  <span className="text-green-600 text-base sm:text-lg font-bold">G</span>
                 </div>
-                <span className="text-xs sm:text-sm text-muted-foreground" data-testid="text-gpay-label">GPay</span>
+                <span className="text-xs text-muted-foreground" data-testid="text-gpay-label">GPay</span>
               </div>
-              <div className="text-xl sm:text-2xl font-bold text-secondary mb-1" data-testid="text-gpay-total">
+              <div className="text-lg sm:text-xl font-bold text-secondary mb-1" data-testid="text-gpay-total">
                 ₹{todaySummary?.gpayAmount || "0.00"}
               </div>
-              <div className="text-xs sm:text-sm text-muted-foreground" data-testid="text-gpay-percentage">
+              <div className="text-xs text-muted-foreground" data-testid="text-gpay-percentage">
                 {todaySummary ? Math.round((parseFloat(todaySummary.gpayAmount) / parseFloat(todaySummary.totalAmount)) * 100) : 0}% of total
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-500/10 rounded-lg flex items-center justify-center">
-                  <span className="text-gray-600 text-lg sm:text-xl">₹</span>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-500/10 rounded-lg flex items-center justify-center">
+                  <span className="text-gray-600 text-base sm:text-lg">₹</span>
                 </div>
-                <span className="text-xs sm:text-sm text-muted-foreground" data-testid="text-cash-label">Cash</span>
+                <span className="text-xs text-muted-foreground" data-testid="text-cash-label">Cash</span>
               </div>
-              <div className="text-xl sm:text-2xl font-bold text-secondary mb-1" data-testid="text-cash-total">
+              <div className="text-lg sm:text-xl font-bold text-secondary mb-1" data-testid="text-cash-total">
                 ₹{todaySummary?.cashAmount || "0.00"}
               </div>
-              <div className="text-xs sm:text-sm text-muted-foreground" data-testid="text-cash-percentage">
+              <div className="text-xs text-muted-foreground" data-testid="text-cash-percentage">
                 {todaySummary ? Math.round((parseFloat(todaySummary.cashAmount) / parseFloat(todaySummary.totalAmount)) * 100) : 0}% of total
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-500/10 rounded-lg flex items-center justify-center">
-                  <Receipt className="text-blue-600 text-lg sm:text-xl" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-500/10 rounded-lg flex items-center justify-center">
+                  <Receipt className="text-blue-600 text-base sm:text-lg" />
                 </div>
-                <span className="text-xs sm:text-sm text-muted-foreground" data-testid="text-orders-label">Orders</span>
+                <span className="text-xs text-muted-foreground" data-testid="text-orders-label">Orders</span>
               </div>
-              <div className="text-xl sm:text-2xl font-bold text-secondary mb-1" data-testid="text-order-count">
+              <div className="text-lg sm:text-xl font-bold text-secondary mb-1" data-testid="text-order-count">
                 {todaySummary?.orderCount || 0}
               </div>
-              <div className="text-xs sm:text-sm text-green-600" data-testid="text-order-growth">+0 from yesterday</div>
+              <div className="text-xs text-green-600" data-testid="text-order-growth">+0 from yesterday</div>
             </CardContent>
           </Card>
         </div>
@@ -557,10 +559,10 @@ export default function DashboardPage() {
 
 
         {/* Transaction Summary */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 mb-6 sm:mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6">
           <Card>
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3 sm:mb-4">
                 <h2 className="text-lg sm:text-xl font-semibold text-secondary" data-testid="daily-summary-title">Daily Summary</h2>
                 <Button
                   onClick={handleDownloadDaily}
@@ -574,8 +576,8 @@ export default function DashboardPage() {
                 </Button>
               </div>
 
-              <div className="space-y-3 sm:space-y-4">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 sm:p-4 bg-muted rounded-lg gap-2">
+              <div className="space-y-2 sm:space-y-3">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-2 sm:p-3 bg-muted rounded-lg gap-1">
                   <div>
                     <div className="font-medium text-secondary text-sm sm:text-base" data-testid="text-total-sales">Total Sales</div>
                     <div className="text-xs sm:text-sm text-muted-foreground" data-testid="text-today-orders">
@@ -590,16 +592,16 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  <div className="p-3 sm:p-4 bg-green-50 rounded-lg border border-green-200">
-                    <div className="text-xs sm:text-sm text-green-700 mb-1" data-testid="text-gpay-payments">GPay Payments</div>
-                    <div className="text-base sm:text-lg font-bold text-green-800" data-testid="text-gpay-amount">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                  <div className="p-2 sm:p-3 bg-green-50 rounded-lg border border-green-200">
+                    <div className="text-xs text-green-700 mb-1" data-testid="text-gpay-payments">GPay Payments</div>
+                    <div className="text-sm sm:text-base font-bold text-green-800" data-testid="text-gpay-amount">
                       ₹{todaySummary?.gpayAmount || "0.00"}
                     </div>
                   </div>
-                  <div className="p-3 sm:p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="text-xs sm:text-sm text-gray-700 mb-1" data-testid="text-cash-payments">Cash Payments</div>
-                    <div className="text-base sm:text-lg font-bold text-gray-800" data-testid="text-cash-amount">
+                  <div className="p-2 sm:p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="text-xs text-gray-700 mb-1" data-testid="text-cash-payments">Cash Payments</div>
+                    <div className="text-sm sm:text-base font-bold text-gray-800" data-testid="text-cash-amount">
                       ₹{todaySummary?.cashAmount || "0.00"}
                     </div>
                   </div>
@@ -609,21 +611,21 @@ export default function DashboardPage() {
           </Card>
 
           <Card>
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3 sm:mb-4">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold text-secondary" data-testid="weekly-summary-title">Weekly Summary</h2>
                   {weekDates.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-xs sm:text-sm text-muted-foreground mb-1">Week Dates with Sales:</p>
-                      <div className="flex flex-wrap gap-1 sm:gap-2">
+                    <div className="mt-1">
+                      <p className="text-xs text-muted-foreground mb-1">Week Dates:</p>
+                      <div className="grid grid-cols-7 gap-0.5">
                         {weekDates.map((dayInfo, index) => (
-                          <div 
+                          <div
                             key={index}
-                            className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-200 flex flex-col items-center"
+                            className="text-xs bg-blue-50 text-blue-700 px-0.5 py-1 rounded border border-blue-200 flex flex-col items-center min-w-[32px] max-w-[40px]"
                           >
-                            <span className="font-medium">{dayInfo.day} {dayInfo.date}</span>
-                            <span className="text-blue-600 font-bold">₹{dayInfo.totalAmount}</span>
+                            <span className="font-medium text-xs leading-tight">{dayInfo.day}</span>
+                            <span className="text-blue-600 font-bold text-xs leading-tight truncate w-full text-center">₹{dayInfo.totalAmount}</span>
                           </div>
                         ))}
                       </div>
@@ -642,8 +644,8 @@ export default function DashboardPage() {
                 </Button>
               </div>
 
-              <div className="space-y-3 sm:space-y-4">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 sm:p-4 bg-muted rounded-lg gap-2">
+              <div className="space-y-2 sm:space-y-3">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-2 sm:p-3 bg-muted rounded-lg gap-1">
                   <div>
                     <div className="font-medium text-secondary text-sm sm:text-base" data-testid="text-week-total">Week Total</div>
                     <div className="text-xs sm:text-sm text-muted-foreground" data-testid="text-week-orders">
@@ -658,16 +660,16 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  <div className="p-3 sm:p-4 bg-green-50 rounded-lg border border-green-200">
-                    <div className="text-xs sm:text-sm text-green-700 mb-1" data-testid="text-week-gpay">GPay Total</div>
-                    <div className="text-base sm:text-lg font-bold text-green-800" data-testid="text-week-gpay-amount">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                  <div className="p-2 sm:p-3 bg-green-50 rounded-lg border border-green-200">
+                    <div className="text-xs text-green-700 mb-1" data-testid="text-week-gpay">GPay Total</div>
+                    <div className="text-sm sm:text-base font-bold text-green-800" data-testid="text-week-gpay-amount">
                       ₹{currentWeek?.gpayAmount || "0.00"}
                     </div>
                   </div>
-                  <div className="p-3 sm:p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="text-xs sm:text-sm text-gray-700 mb-1" data-testid="text-week-cash">Cash Total</div>
-                    <div className="text-base sm:text-lg font-bold text-gray-800" data-testid="text-week-cash-amount">
+                  <div className="p-2 sm:p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="text-xs text-gray-700 mb-1" data-testid="text-week-cash">Cash Total</div>
+                    <div className="text-sm sm:text-base font-bold text-gray-800" data-testid="text-week-cash-amount">
                       ₹{currentWeek?.cashAmount || "0.00"}
                     </div>
                   </div>
@@ -679,8 +681,8 @@ export default function DashboardPage() {
 
         {/* Monthly Summary */}
         <Card>
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3 sm:mb-4">
               <h2 className="text-lg sm:text-xl font-semibold text-secondary" data-testid="monthly-summary-title">Monthly Summary</h2>
               <Button
                 onClick={handleDownloadMonthly}
@@ -694,41 +696,41 @@ export default function DashboardPage() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
-              <div className="p-4 sm:p-6 invoice-gradient text-white rounded-xl">
-                <div className="mb-3 sm:mb-4">
-                  <div className="text-xs sm:text-sm opacity-90" data-testid="text-month-period">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 lg:gap-4">
+              <div className="p-3 sm:p-4 invoice-gradient text-white rounded-xl">
+                <div className="mb-2 sm:mb-3">
+                  <div className="text-xs opacity-90" data-testid="text-month-period">
                     {currentMonth ? new Date(currentMonth.month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : "No data"}
                   </div>
-                  <div className="text-xl sm:text-2xl font-bold" data-testid="text-month-total">
+                  <div className="text-lg sm:text-xl font-bold" data-testid="text-month-total">
                     ₹{currentMonth?.totalAmount || "0.00"}
                   </div>
                 </div>
-                <div className="text-xs sm:text-sm opacity-90" data-testid="text-month-orders">
+                <div className="text-xs opacity-90" data-testid="text-month-orders">
                   {currentMonth?.orderCount || 0} total orders
                 </div>
               </div>
 
-              <div className="p-4 sm:p-6 bg-green-50 rounded-xl border border-green-200">
-                <div className="mb-3 sm:mb-4">
-                  <div className="text-xs sm:text-sm text-green-700" data-testid="text-month-gpay-label">GPay Payments</div>
-                  <div className="text-xl sm:text-2xl font-bold text-green-800" data-testid="text-month-gpay-total">
+              <div className="p-3 sm:p-4 bg-green-50 rounded-xl border border-green-200">
+                <div className="mb-2 sm:mb-3">
+                  <div className="text-xs text-green-700" data-testid="text-month-gpay-label">GPay Payments</div>
+                  <div className="text-lg sm:text-xl font-bold text-green-800" data-testid="text-month-gpay-total">
                     ₹{currentMonth?.gpayAmount || "0.00"}
                   </div>
                 </div>
-                <div className="text-xs sm:text-sm text-green-600" data-testid="text-month-gpay-percentage">
+                <div className="text-xs text-green-600" data-testid="text-month-gpay-percentage">
                   {currentMonth ? ((parseFloat(currentMonth.gpayAmount) / parseFloat(currentMonth.totalAmount)) * 100).toFixed(1) : 0}% of total
                 </div>
               </div>
 
-              <div className="p-4 sm:p-6 bg-gray-50 rounded-xl border border-gray-200">
-                <div className="mb-3 sm:mb-4">
-                  <div className="text-xs sm:text-sm text-gray-700" data-testid="text-month-cash-label">Cash Payments</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-800" data-testid="text-month-cash-total">
+              <div className="p-3 sm:p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <div className="mb-2 sm:mb-3">
+                  <div className="text-xs text-gray-700" data-testid="text-month-cash-label">Cash Payments</div>
+                  <div className="text-lg sm:text-xl font-bold text-gray-800" data-testid="text-month-cash-total">
                     ₹{currentMonth?.cashAmount || "0.00"}
                   </div>
                 </div>
-                <div className="text-xs sm:text-sm text-gray-600" data-testid="text-month-cash-percentage">
+                <div className="text-xs text-gray-600" data-testid="text-month-cash-percentage">
                   {currentMonth ? ((parseFloat(currentMonth.cashAmount) / parseFloat(currentMonth.totalAmount)) * 100).toFixed(1) : 0}% of total
                 </div>
               </div>
@@ -737,11 +739,11 @@ export default function DashboardPage() {
         </Card>
 
         {/* Menu Item Sales Analytics */}
-        <div className="mt-6 sm:mt-8 grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
+        <div className="mt-4 sm:mt-6 grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
           {/* Sales Table */}
           <Card>
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex flex-col gap-3 mb-4 sm:mb-6">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex flex-col gap-2 mb-3 sm:mb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <h2 className="text-lg sm:text-xl font-semibold text-secondary">Items Sold Summary</h2>
                   <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -808,12 +810,12 @@ export default function DashboardPage() {
               ) : (
                 <div className="space-y-4">
                   {menuItemSales && menuItemSales.length > 0 ? (
-                    <div className="max-h-64 overflow-y-auto">
+                    <div className="max-h-48 sm:max-h-64 overflow-y-auto">
                       {/* Mobile Card Layout */}
-                      <div className="block sm:hidden space-y-2">
+                      <div className="block sm:hidden space-y-1">
                         {menuItemSales.map((item, index) => (
-                          <div key={index} className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                            <span className="font-medium text-sm">{item.name}</span>
+                          <div key={index} className="flex justify-between items-center p-2 bg-muted rounded-lg">
+                            <span className="font-medium text-sm truncate pr-2">{item.name}</span>
                             <span className="font-bold text-purple-600 text-sm">{item.totalSold || 0}</span>
                           </div>
                         ))}
@@ -852,8 +854,8 @@ export default function DashboardPage() {
 
           {/* Sales Chart */}
           <Card>
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 sm:mb-4">
                 <h2 className="text-lg sm:text-xl font-semibold text-secondary">Individual Menu Item Sales</h2>
                 <div className="flex items-center gap-2 sm:gap-3">
                   <Select value={chartType} onValueChange={(value: "bar" | "pie") => setChartType(value)}>
@@ -885,7 +887,7 @@ export default function DashboardPage() {
                   <p className="text-sm text-muted-foreground mt-2">Please try refreshing the page</p>
                 </div>
               ) : (
-                <div className="h-60 sm:h-72 lg:h-80">
+                <div className="h-48 sm:h-64 lg:h-80">
                   {chartData && chartData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       {chartType === "bar" ? (
@@ -967,29 +969,29 @@ export default function DashboardPage() {
 
               {/* Sales Summary */}
               {chartData && chartData.length > 0 && (
-                <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t">
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
                     <div className="text-center">
-                      <p className="text-xl sm:text-2xl font-bold text-primary">{chartData.length}</p>
-                      <p className="text-xs sm:text-sm text-muted-foreground">Items Sold</p>
+                      <p className="text-lg sm:text-xl font-bold text-primary">{chartData.length}</p>
+                      <p className="text-xs text-muted-foreground">Items Sold</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-xl sm:text-2xl font-bold text-green-600">
+                      <p className="text-lg sm:text-xl font-bold text-green-600">
                         {chartData.reduce((sum, item) => sum + item.count, 0)}
                       </p>
-                      <p className="text-xs sm:text-sm text-muted-foreground">Total Quantity</p>
+                      <p className="text-xs text-muted-foreground">Total Quantity</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-xl sm:text-2xl font-bold text-blue-600">
+                      <p className="text-lg sm:text-xl font-bold text-blue-600">
                         ₹{chartData.reduce((sum, item) => sum + item.revenue, 0).toFixed(2)}
                       </p>
-                      <p className="text-xs sm:text-sm text-muted-foreground">Total Revenue</p>
+                      <p className="text-xs text-muted-foreground">Total Revenue</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-xl sm:text-2xl font-bold text-purple-600">
+                      <p className="text-lg sm:text-xl font-bold text-purple-600">
                         ₹{chartData.length > 0 ? (chartData.reduce((sum, item) => sum + item.revenue, 0) / chartData.reduce((sum, item) => sum + item.count, 0)).toFixed(2) : '0.00'}
                       </p>
-                      <p className="text-xs sm:text-sm text-muted-foreground">Avg. Price</p>
+                      <p className="text-xs text-muted-foreground">Avg. Price</p>
                     </div>
                   </div>
                 </div>
@@ -1004,7 +1006,7 @@ export default function DashboardPage() {
         
         
 
-        <footer className="mt-12 border-t border-border pt-4 text-center text-xs text-muted-foreground">
+        <footer className="mt-4 sm:mt-6 border-t border-border pt-2 sm:pt-3 text-center text-xs text-muted-foreground">
            <h3>©️ 2025 - 2026 Inwora.in</h3>
         </footer>
       </div>
