@@ -41,17 +41,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Menu item sales endpoint - MUST come before /api/menu/:id
   app.get("/api/menu/sales", async (req, res) => {
     try {
-      const date = req.query.date as string || new Date().toISOString().split('T')[0];
-      const transactions = await storage.getTransactionsByDate(date);
+      const month = req.query.month as string || new Date().toISOString().slice(0,7);
+      const year = parseInt(month.split('-')[0]);
+      const monthNum = parseInt(month.split('-')[1]) - 1; // 0-based
+      const startDate = new Date(year, monthNum, 1).toISOString().split('T')[0];
+      const endDate = new Date(year, monthNum + 1, 0).toISOString().split('T')[0]; // last day of month
+      const transactions = await storage.getTransactionsByDateRange(startDate, endDate);
       const menuItems = await storage.getMenuItems();
-      
+
       const salesData = menuItems.map(item => {
         const totalSold = transactions.reduce((count, transaction) => {
           const items = transaction.items as any[];
           const itemSold = items.find(i => i.id === item.id);
           return count + (itemSold ? itemSold.quantity : 0);
         }, 0);
-        
+
         return {
           id: item.id,
           name: item.name,
@@ -61,7 +65,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           revenue: totalSold * parseFloat(item.price)
         };
       });
-      
+
       res.json(salesData.sort((a, b) => b.totalSold - a.totalSold));
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch menu item sales" });

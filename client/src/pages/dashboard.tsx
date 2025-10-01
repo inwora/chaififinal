@@ -49,11 +49,11 @@ export default function DashboardPage() {
 
 
   const today = format(new Date(), 'yyyy-MM-dd');
-  const selectedDateString = selectedMenuSalesDate ? format(selectedMenuSalesDate, 'yyyy-MM-dd') : today;
+  const selectedMonthString = selectedMenuSalesDate ? format(selectedMenuSalesDate, 'yyyy-MM') : format(new Date(), 'yyyy-MM');
   const { data: menuItemSales = [], isLoading: menuItemSalesLoading, error: menuItemSalesError } = useQuery<any[]>({
-    queryKey: ["/api/menu/sales", selectedDateString],
+    queryKey: ["/api/menu/sales", selectedMonthString],
     queryFn: async () => {
-      const response = await fetch(`/api/menu/sales?date=${selectedDateString}`);
+      const response = await fetch(`/api/menu/sales?month=${selectedMonthString}`);
       if (!response.ok) throw new Error('Failed to fetch menu sales');
       return response.json();
     },
@@ -782,6 +782,7 @@ export default function DashboardPage() {
                         selected={selectedMenuSalesDate}
                         onSelect={setSelectedMenuSalesDate}
                         initialFocus
+                        captionLayout="dropdown-years"
                         className="rounded-md border"
                       />
                     </PopoverContent>

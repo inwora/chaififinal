@@ -8,6 +8,7 @@ import { createServer } from "http";
 // server/storage.ts
 import dotenv from "dotenv";
 import { randomUUID } from "crypto";
+import { format } from "date-fns";
 
 // server/db/mongodb.ts
 import { MongoClient } from "mongodb";
@@ -684,13 +685,13 @@ var MemStorage = class {
     const day = date.getDay();
     const diff = date.getDate() - day;
     const weekStart = new Date(date.setDate(diff));
-    return weekStart.toISOString().split("T")[0];
+    return format(weekStart, "yyyy-MM-dd");
   }
   getWeekEnd(date) {
     const day = date.getDay();
     const diff = date.getDate() - day + 6;
     const weekEnd = new Date(date.setDate(diff));
-    return weekEnd.toISOString().split("T")[0];
+    return format(weekEnd, "yyyy-MM-dd");
   }
   // Clear data methods
   async clearDataByDay(date) {
@@ -890,8 +891,12 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/menu/sales", async (req, res) => {
     try {
-      const date = req.query.date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-      const transactions2 = await storage.getTransactionsByDate(date);
+      const month = req.query.month || (/* @__PURE__ */ new Date()).toISOString().slice(0, 7);
+      const year = parseInt(month.split("-")[0]);
+      const monthNum = parseInt(month.split("-")[1]) - 1;
+      const startDate = new Date(year, monthNum, 1).toISOString().split("T")[0];
+      const endDate = new Date(year, monthNum + 1, 0).toISOString().split("T")[0];
+      const transactions2 = await storage.getTransactionsByDateRange(startDate, endDate);
       const menuItems2 = await storage.getMenuItems();
       const salesData = menuItems2.map((item) => {
         const totalSold = transactions2.reduce((count, transaction) => {
