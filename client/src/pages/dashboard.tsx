@@ -49,17 +49,19 @@ export default function DashboardPage() {
 
 
   const today = format(new Date(), 'yyyy-MM-dd');
-  const selectedMonthString = selectedMenuSalesDate ? format(selectedMenuSalesDate, 'yyyy-MM') : format(new Date(), 'yyyy-MM');
+  const yesterday = format(addDays(new Date(), -1), 'yyyy-MM-dd');
+  const selectedMenuSalesDateString = selectedMenuSalesDate ? format(selectedMenuSalesDate, 'yyyy-MM-dd') : today;
   const { data: menuItemSales = [], isLoading: menuItemSalesLoading, error: menuItemSalesError } = useQuery<any[]>({
-    queryKey: ["/api/menu/sales", selectedMonthString],
+    queryKey: ["/api/menu/sales", selectedMenuSalesDateString],
     queryFn: async () => {
-      const response = await fetch(`/api/menu/sales?month=${selectedMonthString}`);
+      const response = await fetch(`/api/menu/sales?date=${selectedMenuSalesDateString}`);
       if (!response.ok) throw new Error('Failed to fetch menu sales');
       return response.json();
     },
   });
 
   const todaySummary = dailySummaries.find(s => s.date === today);
+  const yesterdaySummary = dailySummaries.find(s => s.date === yesterday);
   const currentWeek = weeklySummaries[0];
   const currentMonth = monthlySummaries[0];
 
@@ -308,7 +310,7 @@ export default function DashboardPage() {
       await generateMenuSalesPDF(transformedData, selectedMenuSalesDate);
       toast({
         title: "PDF Downloaded",
-        description: `Menu sales report for ${format(selectedMenuSalesDate, 'MMM yyyy')} has been downloaded successfully`,
+        description: `Menu sales report for ${format(selectedMenuSalesDate, 'MMM dd, yyyy')} has been downloaded successfully`,
       });
     } catch (error) {
       console.error("Failed to generate menu sales PDF:", error);
@@ -490,7 +492,24 @@ export default function DashboardPage() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4 mb-4 sm:mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 lg:gap-4 mb-4 sm:mb-6">
+          <Card>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-orange-500/10 rounded-lg flex items-center justify-center">
+                  <IndianRupee className="text-orange-600 text-base sm:text-lg" />
+                </div>
+                <span className="text-xs text-muted-foreground" data-testid="text-yesterday-label">Yesterday</span>
+              </div>
+              <div className="text-lg sm:text-xl font-bold text-secondary mb-1" data-testid="text-yesterday-total">
+                ₹{yesterdaySummary?.totalAmount || "0.00"}
+              </div>
+              <div className="text-xs text-muted-foreground" data-testid="text-yesterday-orders">
+                {yesterdaySummary?.orderCount || 0} orders
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between mb-2 sm:mb-3">
@@ -502,7 +521,12 @@ export default function DashboardPage() {
               <div className="text-lg sm:text-xl font-bold text-secondary mb-1" data-testid="text-daily-total">
                 ₹{todaySummary?.totalAmount || "0.00"}
               </div>
-              <div className="text-xs text-green-600" data-testid="text-daily-growth">+0% from yesterday</div>
+              <div className="text-xs text-green-600" data-testid="text-daily-growth">
+                {yesterdaySummary && todaySummary ?
+                  `${((parseFloat(todaySummary.totalAmount) - parseFloat(yesterdaySummary.totalAmount)) / parseFloat(yesterdaySummary.totalAmount) * 100) >= 0 ? '+' : ''}${((parseFloat(todaySummary.totalAmount) - parseFloat(yesterdaySummary.totalAmount)) / parseFloat(yesterdaySummary.totalAmount) * 100).toFixed(1)}% from yesterday`
+                  : '+0% from yesterday'
+                }
+              </div>
             </CardContent>
           </Card>
 
@@ -551,7 +575,12 @@ export default function DashboardPage() {
               <div className="text-lg sm:text-xl font-bold text-secondary mb-1" data-testid="text-order-count">
                 {todaySummary?.orderCount || 0}
               </div>
-              <div className="text-xs text-green-600" data-testid="text-order-growth">+0 from yesterday</div>
+              <div className="text-xs text-green-600" data-testid="text-order-growth">
+                {yesterdaySummary && todaySummary ?
+                  `${(todaySummary.orderCount - yesterdaySummary.orderCount) >= 0 ? '+' : ''}${todaySummary.orderCount - yesterdaySummary.orderCount} from yesterday`
+                  : '+0 from yesterday'
+                }
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -775,7 +804,7 @@ export default function DashboardPage() {
                         data-selected={selectedMenuSalesDate ? "true" : "false"}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {selectedMenuSalesDate ? format(selectedMenuSalesDate, "MMM yyyy") : "Select month/year"}
+                        {selectedMenuSalesDate ? format(selectedMenuSalesDate, "MMM dd, yyyy") : "Select date"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0 calendar-popover" align="start">
@@ -784,7 +813,6 @@ export default function DashboardPage() {
                         selected={selectedMenuSalesDate}
                         onSelect={setSelectedMenuSalesDate}
                         initialFocus
-                        captionLayout="dropdown-years"
                         className="rounded-md border"
                       />
                     </PopoverContent>

@@ -891,11 +891,17 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/menu/sales", async (req, res) => {
     try {
-      const month = req.query.month || (/* @__PURE__ */ new Date()).toISOString().slice(0, 7);
-      const year = parseInt(month.split("-")[0]);
-      const monthNum = parseInt(month.split("-")[1]) - 1;
-      const startDate = new Date(year, monthNum, 1).toISOString().split("T")[0];
-      const endDate = new Date(year, monthNum + 1, 0).toISOString().split("T")[0];
+      let startDate, endDate;
+      if (req.query.date) {
+        startDate = req.query.date;
+        endDate = startDate;
+      } else {
+        const month = req.query.month || (/* @__PURE__ */ new Date()).toISOString().slice(0, 7);
+        const year = parseInt(month.split("-")[0]);
+        const monthNum = parseInt(month.split("-")[1]) - 1;
+        startDate = new Date(year, monthNum, 1).toISOString().split("T")[0];
+        endDate = new Date(year, monthNum + 1, 0).toISOString().split("T")[0];
+      }
       const transactions2 = await storage.getTransactionsByDateRange(startDate, endDate);
       const menuItems2 = await storage.getMenuItems();
       const salesData = menuItems2.map((item) => {

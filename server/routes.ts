@@ -41,11 +41,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Menu item sales endpoint - MUST come before /api/menu/:id
   app.get("/api/menu/sales", async (req, res) => {
     try {
-      const month = req.query.month as string || new Date().toISOString().slice(0,7);
-      const year = parseInt(month.split('-')[0]);
-      const monthNum = parseInt(month.split('-')[1]) - 1; // 0-based
-      const startDate = new Date(year, monthNum, 1).toISOString().split('T')[0];
-      const endDate = new Date(year, monthNum + 1, 0).toISOString().split('T')[0]; // last day of month
+      let startDate: string, endDate: string;
+
+      if (req.query.date) {
+        // Daily sales
+        startDate = req.query.date as string;
+        endDate = startDate;
+      } else {
+        // Monthly sales (default)
+        const month = req.query.month as string || new Date().toISOString().slice(0,7);
+        const year = parseInt(month.split('-')[0]);
+        const monthNum = parseInt(month.split('-')[1]) - 1; // 0-based
+        startDate = new Date(year, monthNum, 1).toISOString().split('T')[0];
+        endDate = new Date(year, monthNum + 1, 0).toISOString().split('T')[0]; // last day of month
+      }
+
       const transactions = await storage.getTransactionsByDateRange(startDate, endDate);
       const menuItems = await storage.getMenuItems();
 
