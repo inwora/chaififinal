@@ -65,6 +65,20 @@ export default function DashboardPage() {
   const currentWeek = weeklySummaries[0];
   const currentMonth = monthlySummaries[0];
 
+  const selectedDateString = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null;
+  const { data: selectedSummary = null } = useQuery<DailySummary | null>({
+    queryKey: selectedDateString ? ["/api/summaries/daily", selectedDateString] : [],
+    queryFn: selectedDateString ? async () => {
+      const response = await fetch(`/api/summaries/daily/${selectedDateString}`);
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error('Failed to fetch selected daily summary');
+      }
+      return response.json();
+    } : undefined,
+    enabled: !!selectedDateString,
+  });
+
   // Generate week dates with sales data for display
   const getWeekDatesWithSales = (weekStart: string, dailySummaries: DailySummary[]) => {
     try {
@@ -584,6 +598,79 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Selected Date Summary Cards */}
+        {selectedSummary && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4 mb-4 sm:mb-6">
+            <Card>
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-500/10 rounded-lg flex items-center justify-center">
+                    <IndianRupee className="text-purple-600 text-base sm:text-lg" />
+                  </div>
+                  <span className="text-xs text-muted-foreground">Selected Date</span>
+                </div>
+                <div className="text-lg sm:text-xl font-bold text-secondary mb-1">
+                  ₹{selectedSummary?.totalAmount || "0.00"}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {selectedSummary?.orderCount || 0} orders
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-500/10 rounded-lg flex items-center justify-center">
+                    <span className="text-green-600 text-base sm:text-lg font-bold">G</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">GPay</span>
+                </div>
+                <div className="text-lg sm:text-xl font-bold text-secondary mb-1">
+                  ₹{selectedSummary?.gpayAmount || "0.00"}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {selectedSummary ? Math.round((parseFloat(selectedSummary.gpayAmount) / parseFloat(selectedSummary.totalAmount)) * 100) : 0}% of total
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-500/10 rounded-lg flex items-center justify-center">
+                    <span className="text-gray-600 text-base sm:text-lg">₹</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">Cash</span>
+                </div>
+                <div className="text-lg sm:text-xl font-bold text-secondary mb-1">
+                  ₹{selectedSummary?.cashAmount || "0.00"}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {selectedSummary ? Math.round((parseFloat(selectedSummary.cashAmount) / parseFloat(selectedSummary.totalAmount)) * 100) : 0}% of total
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-500/10 rounded-lg flex items-center justify-center">
+                    <Receipt className="text-blue-600 text-base sm:text-lg" />
+                  </div>
+                  <span className="text-xs text-muted-foreground">Orders</span>
+                </div>
+                <div className="text-lg sm:text-xl font-bold text-secondary mb-1">
+                  {selectedSummary?.orderCount || 0}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {selectedDate ? format(selectedDate, 'MMM dd, yyyy') : ''}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
 
 
