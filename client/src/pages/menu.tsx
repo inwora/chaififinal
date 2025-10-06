@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ShoppingCart, Plus, Minus, BarChart3, Search, X } from "lucide-react";
+import { ShoppingCart, Plus, Minus, BarChart3, Search, X, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -13,23 +13,31 @@ export default function MenuPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
 
-  const { data: menuItems = [], isLoading } = useQuery<MenuItem[]>({
+  const { data: menuItems = [], isLoading, error, refetch } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu"],
+    refetchOnMount: true, // Always refetch when component mounts
   });
 
   const categories = useMemo(() => {
-    const uniqueCategories = Array.from(new Set(menuItems.map(item => item.category)));
+    const uniqueCategories = Array.from(
+      new Set(
+        menuItems
+          .map((item) => item.category)
+          .filter((category): category is string => typeof category === "string" && category.trim().length > 0)
+      )
+    );
     return ["All Items", ...uniqueCategories.sort()];
   }, [menuItems]);
 
   const filteredItems = useMemo(() => {
-    let items = menuItems;
+    // Don't filter out items with missing fields - show all items
+    let items = menuItems.filter(item => item && item.id);
 
     // Filter by search query
     if (searchQuery.trim()) {
       items = items.filter(item =>
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchQuery.toLowerCase())
+        (item.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+        (item.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
       );
     }
 
@@ -106,6 +114,17 @@ export default function MenuPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">Failed to load menu items</p>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background p-4 pb-28 sm:pb-6">
       <div className="max-w-6xl mx-auto">
@@ -115,6 +134,17 @@ export default function MenuPage() {
             <p className="text-sm sm:text-base text-muted-foreground" data-testid="menu-subtitle">Select items to add to your order</p>
           </div>
           <div className="flex flex-wrap gap-2 sm:gap-3 sm:justify-end">
+            <Button
+              onClick={() => refetch()}
+              variant="outline"
+              size="sm"
+              className="px-3 py-2 sm:px-4 sm:py-3 rounded-lg font-semibold hover:bg-secondary hover:text-secondary-foreground transition-colors"
+              data-testid="button-refresh"
+              title="Refresh menu"
+            >
+              <RefreshCw className="sm:mr-2" size={18} />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
             <Button
               onClick={() => navigate("/dashboard")}
               variant="outline"
@@ -201,22 +231,25 @@ export default function MenuPage() {
                   data-testid={`card-menu-item-${item.id}`}
                 >
                   <img
-                    src={item.image}
-                    alt={item.name}
+                    src={item.image || '/placeholder-image.png'}
+                    alt={item.name || 'Menu item'}
                     className="w-full h-28 object-cover sm:h-48 sm:aspect-[4/3]"
                     data-testid={`img-menu-item-${item.id}`}
                     loading="lazy"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x300?text=No+Image';
+                    }}
                   />
                   <div className="p-3 sm:p-5">
                     <h3 className="font-semibold text-secondary text-sm sm:text-lg mb-1" data-testid={`text-item-name-${item.id}`}>
-                      {item.name}
+                      {item.name || 'Unnamed Item'}
                     </h3>
                     <p className="text-muted-foreground text-xs sm:text-[0.95rem] mb-2 sm:mb-3 line-clamp-2 sm:line-clamp-3" data-testid={`text-item-description-${item.id}`}>
-                      {item.description}
+                      {item.description || 'No description available'}
                     </p>
                     <div className="flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <span className="text-base sm:text-xl font-bold text-primary" data-testid={`text-item-price-${item.id}`}>
-                        ₹{item.price}
+                        ₹{item.price || '0'}
                       </span>
                       <div className="flex items-center gap-2 sm:gap-3">
                         {getItemQuantity(item.id) > 0 && (

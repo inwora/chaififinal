@@ -13,6 +13,8 @@ import PaymentPage from "@/pages/payment";
 import InvoicePage from "@/pages/invoice";
 import DashboardPage from "@/pages/dashboard";
 import AdminPage from "@/pages/admin";
+import InventoryPage from "@/pages/inventory";
+
 
 function Router() {
   return (
@@ -26,6 +28,7 @@ function Router() {
 
       <Route path="/invoice" component={InvoicePage} />
       <Route path="/dashboard" component={DashboardPage} />
+      <Route path="/inventory" component={InventoryPage} />
       <Route component={NotFound} />
     </Switch>
   );

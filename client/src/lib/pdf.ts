@@ -86,11 +86,23 @@ export const generateDailySummaryPDF = async (summary: DailySummary, transaction
   doc.setFontSize(16);
   doc.text(`Daily Summary - ${summary.date}`, 20, 60);
   
-  doc.setFontSize(12);
-  doc.text(`Total Sales: ₹${summary.totalAmount}`, 20, 80);
-  doc.text(`GPay Payments: ₹${summary.gpayAmount}`, 20, 90);
-  doc.text(`Cash Payments: ₹${summary.cashAmount}`, 20, 100);
-  doc.text(`Total Orders: ${summary.orderCount}`, 20, 110);
+  // Check if there's no data
+  const hasNoData = summary.totalAmount === '0.00' && summary.orderCount === 0;
+  
+  if (hasNoData) {
+    doc.setFontSize(14);
+    doc.setTextColor(150, 150, 150);
+    doc.text('No Data Available', 20, 90);
+    doc.setFontSize(10);
+    doc.text('There are no transactions recorded for this day.', 20, 105);
+    doc.setTextColor(0, 0, 0);
+  } else {
+    doc.setFontSize(12);
+    doc.text(`Total Sales: ₹${summary.totalAmount}`, 20, 80);
+    doc.text(`GPay Payments: ₹${summary.gpayAmount}`, 20, 90);
+    doc.text(`Cash Payments: ₹${summary.cashAmount}`, 20, 100);
+    doc.text(`Total Orders: ${summary.orderCount}`, 20, 110);
+  }
   
   // Add downloading time
   doc.setFontSize(10);
@@ -118,14 +130,26 @@ export const generateWeeklySummaryPDF = async (summary: WeeklySummary, transacti
   doc.setFontSize(16);
   doc.text(`Weekly Summary - ${summary.weekStart} to ${summary.weekEnd}`, 20, 60);
   
-  doc.setFontSize(12);
-  doc.text(`Total Sales: ₹${summary.totalAmount}`, 20, 80);
-  doc.text(`GPay Payments: ₹${summary.gpayAmount}`, 20, 90);
-  doc.text(`Cash Payments: ₹${summary.cashAmount}`, 20, 100);
-  doc.text(`Total Orders: ${summary.orderCount}`, 20, 110);
+  // Check if there's no data
+  const hasNoData = summary.totalAmount === '0.00' && summary.orderCount === 0;
   
-  // Add daily breakdown if available
-  if (dailySummaries && dailySummaries.length > 0) {
+  if (hasNoData) {
+    doc.setFontSize(14);
+    doc.setTextColor(150, 150, 150);
+    doc.text('No Data Available', 20, 90);
+    doc.setFontSize(10);
+    doc.text('There are no transactions recorded for this week.', 20, 105);
+    doc.setTextColor(0, 0, 0);
+  } else {
+    doc.setFontSize(12);
+    doc.text(`Total Sales: ₹${summary.totalAmount}`, 20, 80);
+    doc.text(`GPay Payments: ₹${summary.gpayAmount}`, 20, 90);
+    doc.text(`Cash Payments: ₹${summary.cashAmount}`, 20, 100);
+    doc.text(`Total Orders: ${summary.orderCount}`, 20, 110);
+  }
+  
+  // Add daily breakdown if available and there's data
+  if (!hasNoData && dailySummaries && dailySummaries.length > 0) {
     doc.setFontSize(14);
     doc.text('Daily Breakdown:', 20, 130);
     
@@ -164,41 +188,156 @@ export const generateWeeklySummaryPDF = async (summary: WeeklySummary, transacti
   } else {
     // Add downloading time
     doc.setFontSize(10);
-    doc.text(`Downloaded on: ${new Date().toLocaleString()}`, 20, 130);
+    doc.text(`Downloaded on: ${new Date().toLocaleString()}`, 20, hasNoData ? 130 : 130);
   }
   
   doc.save(`chai-fi-weekly-summary-${summary.weekStart}.pdf`);
 };
 
-export const generateMonthlySummaryPDF = async (summary: MonthlySummary, transactions: Transaction[]) => {
+export const generateMonthlySummaryPDF = async (summary: MonthlySummary, dailySummaries: DailySummary[], weeklySummaries?: WeeklySummary[]) => {
   const doc = new jsPDF();
-  
+
   // Header
   doc.setFillColor(255, 102, 51);
   doc.rect(0, 0, 210, 40, 'F');
-  
+
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(24);
   doc.text('Chai-Fi', 20, 25);
   doc.setFontSize(12);
   doc.text('Monthly Summary Report', 20, 32);
-  
+
   doc.setTextColor(0, 0, 0);
-  
+
   // Summary Details
   doc.setFontSize(16);
   doc.text(`Monthly Summary - ${summary.month}`, 20, 60);
-  
+
+  // Check if there's no data
+  const hasNoData = summary.totalAmount === '0.00' && summary.orderCount === 0;
+
+  if (hasNoData) {
+    doc.setFontSize(14);
+    doc.setTextColor(150, 150, 150);
+    doc.text('No Data Available', 20, 90);
+    doc.setFontSize(10);
+    doc.text('There are no transactions recorded for this month.', 20, 105);
+    doc.setTextColor(0, 0, 0);
+    
+    // Add downloading time
+    doc.setFontSize(10);
+    doc.text(`Downloaded on: ${new Date().toLocaleString()}`, 20, 130);
+    
+    doc.save(`chai-fi-monthly-summary-${summary.month}.pdf`);
+    return;
+  }
+
   doc.setFontSize(12);
   doc.text(`Total Sales: ₹${summary.totalAmount}`, 20, 80);
   doc.text(`GPay Payments: ₹${summary.gpayAmount}`, 20, 90);
   doc.text(`Cash Payments: ₹${summary.cashAmount}`, 20, 100);
   doc.text(`Total Orders: ${summary.orderCount}`, 20, 110);
-  
-  // Add downloading time
+
+  let yPos = 130;
+
+  // Weekly Breakdown Table
+  if (weeklySummaries && weeklySummaries.length > 0) {
+    doc.setFontSize(14);
+    doc.text('Weekly Breakdown', 20, yPos);
+    yPos += 10;
+
+    // Table Header
+    doc.setFontSize(10);
+    doc.text('Week', 20, yPos);
+    doc.text('Start Date', 50, yPos);
+    doc.text('End Date', 80, yPos);
+    doc.text('Sales', 110, yPos);
+    doc.text('Orders', 140, yPos);
+    doc.text('G Pay', 160, yPos);
+    doc.text('Cash', 180, yPos);
+
+    yPos += 5;
+    doc.line(20, yPos, 190, yPos);
+    yPos += 8;
+
+    // Weekly data rows
+    weeklySummaries.forEach((week) => {
+      // Calculate week number based on the day of the month
+      // Week 1: days 1-7, Week 2: days 8-14, Week 3: days 15-21, Week 4: days 22-31
+      const weekStartDate = new Date(week.weekStart);
+      const dayOfMonth = weekStartDate.getDate();
+      const weekNumber = Math.ceil(dayOfMonth / 7);
+      
+      doc.setFontSize(9);
+      doc.text(`Week ${weekNumber}`, 20, yPos);
+      doc.text(week.weekStart, 50, yPos);
+      doc.text(week.weekEnd, 80, yPos);
+      doc.text(`₹${week.totalAmount}`, 110, yPos);
+      doc.text(week.orderCount.toString(), 140, yPos);
+      doc.text(`₹${week.gpayAmount}`, 160, yPos);
+      doc.text(`₹${week.cashAmount}`, 180, yPos);
+      yPos += 7;
+    });
+
+    yPos += 10;
+  }
+
+  // Daily Breakdown Table
+  if (dailySummaries && dailySummaries.length > 0) {
+    // Check if we need a new page
+    if (yPos > 250) {
+      doc.addPage();
+      yPos = 20;
+    }
+
+    doc.setFontSize(14);
+    doc.text('Daily Breakdown', 20, yPos);
+    yPos += 10;
+
+    // Table Header
+    doc.setFontSize(10);
+    doc.text('Date', 20, yPos);
+    doc.text('Day', 45, yPos);
+    doc.text('Sales', 70, yPos);
+    doc.text('Orders', 95, yPos);
+    doc.text('G Pay', 115, yPos);
+    doc.text('Cash', 140, yPos);
+
+    yPos += 5;
+    doc.line(20, yPos, 190, yPos);
+    yPos += 8;
+
+    // Daily data rows
+    dailySummaries.forEach((day) => {
+      const dayName = new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' });
+      const formattedDate = format(new Date(day.date), 'dd/MM');
+
+      doc.setFontSize(9);
+      doc.text(formattedDate, 20, yPos);
+      doc.text(dayName, 45, yPos);
+      doc.text(`₹${day.totalAmount}`, 70, yPos);
+      doc.text(day.orderCount.toString(), 95, yPos);
+      doc.text(`₹${day.gpayAmount}`, 115, yPos);
+      doc.text(`₹${day.cashAmount}`, 140, yPos);
+      yPos += 7;
+
+      // Check if we need a new page
+      if (yPos > 270) {
+        doc.addPage();
+        yPos = 20;
+      }
+    });
+  }
+
+  // Footer
+  if (yPos > 250) {
+    doc.addPage();
+    yPos = 20;
+  }
+
   doc.setFontSize(10);
-  doc.text(`Downloaded on: ${new Date().toLocaleString()}`, 20, 130);
-  
+  doc.text(`Downloaded on: ${new Date().toLocaleString()}`, 20, yPos);
+
   doc.save(`chai-fi-monthly-summary-${summary.month}.pdf`);
 };
 

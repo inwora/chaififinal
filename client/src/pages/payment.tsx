@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import type { CartItem } from "@shared/schema";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function PaymentPage() {
   const [, navigate] = useLocation();
@@ -26,6 +27,7 @@ export default function PaymentPage() {
   ]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const savedCart = localStorage.getItem("cart");
@@ -142,6 +144,12 @@ export default function PaymentPage() {
 
       localStorage.setItem("currentTransaction", JSON.stringify(transaction));
       localStorage.removeItem("cart");
+
+      // Invalidate all summary queries to refresh the dashboard data
+      queryClient.invalidateQueries({ queryKey: ["/api/summaries/daily"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/summaries/weekly"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/summaries/monthly"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/menu/sales"] });
 
       toast({
         title: "Payment successful",

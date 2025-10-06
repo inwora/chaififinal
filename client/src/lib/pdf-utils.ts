@@ -67,7 +67,7 @@ const addFooter = (doc: jsPDF, yPosition: number) => {
 // Helper function to format currency
 const formatCurrency = (amount: string | number): string => {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return `₹${num.toFixed(2)}`;
+  return `Rs. ${num.toFixed(2)}`;
 };
 
 export const generateInvoicePDF = async (transaction: Transaction) => {

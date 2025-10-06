@@ -2,6 +2,8 @@ import { MongoClient, Db, Collection } from 'mongodb';
 import { 
   type User, 
   type InsertUser, 
+  type Category,
+  type InsertCategory,
   type MenuItem, 
   type InsertMenuItem, 
   type Transaction, 
@@ -11,7 +13,11 @@ import {
   type WeeklySummary, 
   type InsertWeeklySummary, 
   type MonthlySummary, 
-  type InsertMonthlySummary 
+  type InsertMonthlySummary,
+  type InventorySession,
+  type InsertInventorySession,
+  type InventoryItem,
+  type InsertInventoryItem
 } from "@shared/schema";
 import { type IStorage } from "../storage";
 
@@ -19,22 +25,28 @@ export class MongoStorage implements IStorage {
   private client: MongoClient;
   private db: Db;
   private users: Collection<User>;
+  private categories: Collection<Category>;
   private menuItems: Collection<MenuItem>;
   private transactions: Collection<Transaction>;
   private dailySummaries: Collection<DailySummary>;
   private weeklySummaries: Collection<WeeklySummary>;
   private monthlySummaries: Collection<MonthlySummary>;
+  private inventorySessions: Collection<InventorySession>;
+  private inventoryItems: Collection<InventoryItem>;
   private isConnected: boolean = false;
 
   constructor(connectionString: string, databaseName: string = 'chai-fi') {
     this.client = new MongoClient(connectionString);
     this.db = this.client.db(databaseName);
     this.users = this.db.collection<User>('users');
+    this.categories = this.db.collection<Category>('categories');
     this.menuItems = this.db.collection<MenuItem>('menu_items');
     this.transactions = this.db.collection<Transaction>('transactions');
     this.dailySummaries = this.db.collection<DailySummary>('daily_summaries');
     this.weeklySummaries = this.db.collection<WeeklySummary>('weekly_summaries');
     this.monthlySummaries = this.db.collection<MonthlySummary>('monthly_summaries');
+    this.inventorySessions = this.db.collection<InventorySession>('inventory_sessions');
+    this.inventoryItems = this.db.collection<InventoryItem>('inventory_items');
   }
 
   async connect(): Promise<void> {
@@ -68,6 +80,12 @@ export class MongoStorage implements IStorage {
       await this.createUser({ username: "Chai-fi", password: "Chai-fi@2025" }); // Regular user
     }
 
+    // Create default categories if collection is empty
+    const categoryCount = await this.categories.countDocuments();
+    if (categoryCount === 0) {
+      await this.initializeCategories();
+    }
+
     // Create default menu items if collection is empty
     const menuCount = await this.menuItems.countDocuments();
     if (menuCount === 0) {
@@ -80,11 +98,25 @@ export class MongoStorage implements IStorage {
 
   private async createIndexes(): Promise<void> {
     await this.users.createIndex({ username: 1 }, { unique: true });
+    await this.categories.createIndex({ name: 1 }, { unique: true });
     await this.transactions.createIndex({ date: 1 });
     await this.transactions.createIndex({ createdAt: -1 });
     await this.dailySummaries.createIndex({ date: 1 }, { unique: true });
     await this.weeklySummaries.createIndex({ weekStart: 1 }, { unique: true });
     await this.monthlySummaries.createIndex({ month: 1 }, { unique: true });
+  }
+
+  private async initializeCategories(): Promise<void> {
+    const defaultCategories: (InsertCategory & { _id?: string })[] = [
+      { name: "Tea", subCategories: [] },
+      { name: "Coffee", subCategories: [] },
+      { name: "Snacks", subCategories: [] },
+      { name: "Beverages", subCategories: [] },
+    ];
+
+    for (const category of defaultCategories) {
+      await this.createCategory(category);
+    }
   }
 
   private async initializeMenuItems(): Promise<void> {
@@ -178,9 +210,53 @@ export class MongoStorage implements IStorage {
     return user;
   }
 
+  // Categories
+  async getCategories(): Promise<Category[]> {
+    return await this.categories.find({}).toArray();
+  }
+
+  async getCategory(id: string): Promise<Category | undefined> {
+    const category = await this.categories.findOne({ id });
+    return category || undefined;
+  }
+
+  async getCategoryByName(name: string): Promise<Category | undefined> {
+    const category = await this.categories.findOne({ name });
+    return category || undefined;
+  }
+
+  async createCategory(insertCategory: InsertCategory): Promise<Category> {
+    const id = new Date().getTime().toString();
+    const category: Category = { 
+      ...insertCategory, 
+      id,
+      createdAt: new Date(),
+      subCategories: insertCategory.subCategories || []
+    };
+    await this.categories.insertOne(category);
+    return category;
+  }
+
+  async updateCategory(id: string, updateData: Partial<Category>): Promise<Category | undefined> {
+    const result = await this.categories.findOneAndUpdate(
+      { id },
+      { $set: updateData },
+      { returnDocument: 'after' }
+    );
+    return result || undefined;
+  }
+
+  async deleteCategory(id: string): Promise<boolean> {
+    const result = await this.categories.deleteOne({ id });
+    return result.deletedCount > 0;
+  }
+
   // Menu Items
   async getMenuItems(): Promise<MenuItem[]> {
-    return await this.menuItems.find({}).toArray();
+    const items = await this.menuItems.find({}).toArray();
+    console.log(`Total items in MongoDB: ${items.length}`);
+    console.log(`Returning all ${items.length} menu items (no filtering)`);
+    return items;
   }
 
   async getMenuItem(id: string): Promise<MenuItem | undefined> {
@@ -195,7 +271,15 @@ export class MongoStorage implements IStorage {
       id,
       available: insertItem.available ?? true 
     };
+    
+    console.log("Creating menu item in MongoDB:", item);
     await this.menuItems.insertOne(item);
+    console.log("Menu item inserted successfully with ID:", id);
+    
+    // Verify the item was inserted
+    const verifyItem = await this.menuItems.findOne({ id });
+    console.log("Verification - Item found in DB:", verifyItem ? "Yes" : "No");
+    
     return item;
   }
 
@@ -206,6 +290,21 @@ export class MongoStorage implements IStorage {
       { returnDocument: 'after' }
     );
     return result || undefined;
+  }
+
+  async deleteMenuItem(id: string): Promise<boolean> {
+    const result = await this.menuItems.deleteOne({ id });
+    return result.deletedCount > 0;
+  }
+
+  async deleteMenuItems(ids: string[]): Promise<number> {
+    const result = await this.menuItems.deleteMany({ id: { $in: ids } });
+    return result.deletedCount;
+  }
+
+  async deleteAllMenuItems(): Promise<number> {
+    const result = await this.menuItems.deleteMany({});
+    return result.deletedCount;
   }
 
   // Transactions
@@ -449,18 +548,103 @@ export class MongoStorage implements IStorage {
 
   // Clear data methods
   async clearDataByDay(date: string): Promise<void> {
+    // Get the daily summary before deleting to update higher-level summaries
+    const dailySummary = await this.getDailySummary(date);
+
     await this.transactions.deleteMany({ date });
+
+    // Remove inventory data for the day
+    const inventorySession = await this.getInventorySessionByDate(date);
+    if (inventorySession) {
+      // Remove all inventory items for this session
+      await this.inventoryItems.deleteMany({ sessionId: inventorySession.id });
+      
+      // Remove the inventory session
+      await this.inventorySessions.deleteOne({ id: inventorySession.id });
+    }
+
+    // Update weekly summary by subtracting the daily amounts
+    if (dailySummary) {
+      const weekStart = this.getWeekStart(new Date(date));
+      const existingWeekly = await this.getWeeklySummary(weekStart);
+      if (existingWeekly) {
+        existingWeekly.totalAmount = (parseFloat(existingWeekly.totalAmount) - parseFloat(dailySummary.totalAmount)).toFixed(2);
+        existingWeekly.gpayAmount = (parseFloat(existingWeekly.gpayAmount) - parseFloat(dailySummary.gpayAmount)).toFixed(2);
+        existingWeekly.cashAmount = (parseFloat(existingWeekly.cashAmount) - parseFloat(dailySummary.cashAmount)).toFixed(2);
+        existingWeekly.orderCount -= dailySummary.orderCount;
+        await this.weeklySummaries.updateOne(
+          { weekStart },
+          { $set: existingWeekly }
+        );
+      }
+
+      // Update monthly summary by subtracting the daily amounts
+      const month = date.substring(0, 7); // YYYY-MM
+      const existingMonthly = await this.getMonthlySummary(month);
+      if (existingMonthly) {
+        existingMonthly.totalAmount = (parseFloat(existingMonthly.totalAmount) - parseFloat(dailySummary.totalAmount)).toFixed(2);
+        existingMonthly.gpayAmount = (parseFloat(existingMonthly.gpayAmount) - parseFloat(dailySummary.gpayAmount)).toFixed(2);
+        existingMonthly.cashAmount = (parseFloat(existingMonthly.cashAmount) - parseFloat(dailySummary.cashAmount)).toFixed(2);
+        existingMonthly.orderCount -= dailySummary.orderCount;
+        await this.monthlySummaries.updateOne(
+          { month },
+          { $set: existingMonthly }
+        );
+      }
+    }
+
     await this.dailySummaries.deleteOne({ date });
   }
 
   async clearDataByWeek(weekStart: string): Promise<void> {
     const weekEnd = this.getWeekEnd(new Date(weekStart));
-    await this.transactions.deleteMany({ 
-      date: { 
-        $gte: weekStart, 
-        $lte: weekEnd 
-      } 
+
+    // Get the weekly summary before deleting to update monthly summary
+    const weeklySummary = await this.getWeeklySummary(weekStart);
+
+    await this.transactions.deleteMany({
+      date: {
+        $gte: weekStart,
+        $lte: weekEnd
+      }
     });
+
+    // Delete inventory data for the week
+    const dates = this.getDatesBetween(weekStart, weekEnd);
+    for (const date of dates) {
+      const inventorySession = await this.getInventorySessionByDate(date);
+      if (inventorySession) {
+        // Delete all inventory items for this session
+        await this.inventoryItems.deleteMany({ sessionId: inventorySession.id });
+        // Delete the inventory session
+        await this.inventorySessions.deleteOne({ id: inventorySession.id });
+      }
+    }
+
+    // Delete daily summaries for the week
+    await this.dailySummaries.deleteMany({
+      date: {
+        $gte: weekStart,
+        $lte: weekEnd
+      }
+    });
+
+    // Update monthly summary by subtracting the weekly amounts
+    if (weeklySummary) {
+      const month = weekStart.substring(0, 7); // YYYY-MM
+      const existingMonthly = await this.getMonthlySummary(month);
+      if (existingMonthly) {
+        existingMonthly.totalAmount = (parseFloat(existingMonthly.totalAmount) - parseFloat(weeklySummary.totalAmount)).toFixed(2);
+        existingMonthly.gpayAmount = (parseFloat(existingMonthly.gpayAmount) - parseFloat(weeklySummary.gpayAmount)).toFixed(2);
+        existingMonthly.cashAmount = (parseFloat(existingMonthly.cashAmount) - parseFloat(weeklySummary.cashAmount)).toFixed(2);
+        existingMonthly.orderCount -= weeklySummary.orderCount;
+        await this.monthlySummaries.updateOne(
+          { month },
+          { $set: existingMonthly }
+        );
+      }
+    }
+
     await this.weeklySummaries.deleteOne({ weekStart });
   }
 
@@ -473,6 +657,146 @@ export class MongoStorage implements IStorage {
         $lte: endDate 
       } 
     });
+
+    // Delete inventory data for the month
+    const dates = this.getDatesBetween(startDate, endDate);
+    for (const date of dates) {
+      const inventorySession = await this.getInventorySessionByDate(date);
+      if (inventorySession) {
+        // Delete all inventory items for this session
+        await this.inventoryItems.deleteMany({ sessionId: inventorySession.id });
+        // Delete the inventory session
+        await this.inventorySessions.deleteOne({ id: inventorySession.id });
+      }
+    }
+
+    // Delete daily summaries for the month
+    await this.dailySummaries.deleteMany({
+      date: {
+        $gte: startDate,
+        $lte: endDate
+      }
+    });
+
+    // Delete weekly summaries for the month
+    await this.weeklySummaries.deleteMany({
+      weekStart: {
+        $gte: startDate,
+        $lte: endDate
+      }
+    });
+
     await this.monthlySummaries.deleteOne({ month });
+  }
+
+  // Inventory methods
+  async createInventorySession(session: InsertInventorySession): Promise<InventorySession> {
+    const id = new Date().getTime().toString();
+    const inventorySession: InventorySession = {
+      ...session,
+      id,
+      createdAt: new Date(),
+    };
+    await this.inventorySessions.insertOne(inventorySession);
+    return inventorySession;
+  }
+
+  async getInventorySessionByDate(date: string): Promise<InventorySession | undefined> {
+    const session = await this.inventorySessions.findOne({ date });
+    return session || undefined;
+  }
+
+  async getInventorySessions(): Promise<InventorySession[]> {
+    return await this.inventorySessions
+      .find({})
+      .sort({ startTime: -1 })
+      .toArray();
+  }
+
+  async updateInventorySession(id: string, updates: Partial<InventorySession>): Promise<InventorySession | undefined> {
+    const result = await this.inventorySessions.findOneAndUpdate(
+      { id },
+      { $set: updates },
+      { returnDocument: 'after' }
+    );
+    return result || undefined;
+  }
+
+  async createInventoryItem(item: InsertInventoryItem): Promise<InventoryItem> {
+    const id = new Date().getTime().toString() + Math.random().toString(36).substr(2, 9);
+    const inventoryItem: InventoryItem = {
+      ...item,
+      id,
+      createdAt: new Date(),
+    };
+    await this.inventoryItems.insertOne(inventoryItem);
+    return inventoryItem;
+  }
+
+  async getInventoryItemsBySession(sessionId: string): Promise<InventoryItem[]> {
+    return await this.inventoryItems
+      .find({ sessionId })
+      .toArray();
+  }
+
+  async updateInventoryItem(id: string, updates: Partial<InventoryItem>): Promise<InventoryItem | undefined> {
+    const result = await this.inventoryItems.findOneAndUpdate(
+      { id },
+      { $set: updates },
+      { returnDocument: 'after' }
+    );
+    return result || undefined;
+  }
+
+  async getInventoryItemsWithMenu(sessionId: string): Promise<(InventoryItem & { menuItem: MenuItem })[]> {
+    const items = await this.getInventoryItemsBySession(sessionId);
+    const result = [];
+    
+    for (const item of items) {
+      const menuItem = await this.getMenuItem(item.menuItemId);
+      if (menuItem) {
+        result.push({ ...item, menuItem });
+      }
+    }
+    
+    return result;
+  }
+
+  async calculateStockOutForSession(sessionId: string, date: string): Promise<void> {
+    const transactions = await this.getTransactionsByDate(date);
+    const inventoryItems = await this.getInventoryItemsBySession(sessionId);
+    
+    // Calculate stock out for each inventory item
+    for (const inventoryItem of inventoryItems) {
+      let stockOut = 0;
+      
+      // Sum up quantities from all transactions
+      for (const transaction of transactions) {
+        const items = transaction.items as any[];
+        const soldItem = items.find(i => i.id === inventoryItem.menuItemId);
+        if (soldItem) {
+          stockOut += soldItem.quantity;
+        }
+      }
+      
+      // Update inventory item
+      const stockLeft = inventoryItem.stockIn - stockOut;
+      await this.updateInventoryItem(inventoryItem.id, {
+        stockOut,
+        stockLeft,
+      });
+    }
+  }
+
+  async clearInventoryByDate(date: string): Promise<void> {
+    // Remove inventory data for the specified date only
+    const inventorySession = await this.getInventorySessionByDate(date);
+    if (inventorySession) {
+      // Remove all inventory items for this session
+      await this.inventoryItems.deleteMany({ sessionId: inventorySession.id });
+      
+      // Remove the inventory session
+      await this.inventorySessions.deleteOne({ id: inventorySession.id });
+    }
   }
 }

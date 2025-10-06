@@ -16,21 +16,27 @@ var MongoStorage = class {
   client;
   db;
   users;
+  categories;
   menuItems;
   transactions;
   dailySummaries;
   weeklySummaries;
   monthlySummaries;
+  inventorySessions;
+  inventoryItems;
   isConnected = false;
   constructor(connectionString, databaseName = "chai-fi") {
     this.client = new MongoClient(connectionString);
     this.db = this.client.db(databaseName);
     this.users = this.db.collection("users");
+    this.categories = this.db.collection("categories");
     this.menuItems = this.db.collection("menu_items");
     this.transactions = this.db.collection("transactions");
     this.dailySummaries = this.db.collection("daily_summaries");
     this.weeklySummaries = this.db.collection("weekly_summaries");
     this.monthlySummaries = this.db.collection("monthly_summaries");
+    this.inventorySessions = this.db.collection("inventory_sessions");
+    this.inventoryItems = this.db.collection("inventory_items");
   }
   async connect() {
     if (!this.isConnected) {
@@ -56,6 +62,10 @@ var MongoStorage = class {
     if (!existingUser) {
       await this.createUser({ username: "Chai-fi", password: "Chai-fi@2025" });
     }
+    const categoryCount = await this.categories.countDocuments();
+    if (categoryCount === 0) {
+      await this.initializeCategories();
+    }
     const menuCount = await this.menuItems.countDocuments();
     if (menuCount === 0) {
       await this.initializeMenuItems();
@@ -64,11 +74,23 @@ var MongoStorage = class {
   }
   async createIndexes() {
     await this.users.createIndex({ username: 1 }, { unique: true });
+    await this.categories.createIndex({ name: 1 }, { unique: true });
     await this.transactions.createIndex({ date: 1 });
     await this.transactions.createIndex({ createdAt: -1 });
     await this.dailySummaries.createIndex({ date: 1 }, { unique: true });
     await this.weeklySummaries.createIndex({ weekStart: 1 }, { unique: true });
     await this.monthlySummaries.createIndex({ month: 1 }, { unique: true });
+  }
+  async initializeCategories() {
+    const defaultCategories = [
+      { name: "Tea", subCategories: [] },
+      { name: "Coffee", subCategories: [] },
+      { name: "Snacks", subCategories: [] },
+      { name: "Beverages", subCategories: [] }
+    ];
+    for (const category of defaultCategories) {
+      await this.createCategory(category);
+    }
   }
   async initializeMenuItems() {
     const defaultItems = [
@@ -156,9 +178,47 @@ var MongoStorage = class {
     await this.users.insertOne(user);
     return user;
   }
+  // Categories
+  async getCategories() {
+    return await this.categories.find({}).toArray();
+  }
+  async getCategory(id) {
+    const category = await this.categories.findOne({ id });
+    return category || void 0;
+  }
+  async getCategoryByName(name) {
+    const category = await this.categories.findOne({ name });
+    return category || void 0;
+  }
+  async createCategory(insertCategory) {
+    const id = (/* @__PURE__ */ new Date()).getTime().toString();
+    const category = {
+      ...insertCategory,
+      id,
+      createdAt: /* @__PURE__ */ new Date(),
+      subCategories: insertCategory.subCategories || []
+    };
+    await this.categories.insertOne(category);
+    return category;
+  }
+  async updateCategory(id, updateData) {
+    const result = await this.categories.findOneAndUpdate(
+      { id },
+      { $set: updateData },
+      { returnDocument: "after" }
+    );
+    return result || void 0;
+  }
+  async deleteCategory(id) {
+    const result = await this.categories.deleteOne({ id });
+    return result.deletedCount > 0;
+  }
   // Menu Items
   async getMenuItems() {
-    return await this.menuItems.find({}).toArray();
+    const items = await this.menuItems.find({}).toArray();
+    console.log(`Total items in MongoDB: ${items.length}`);
+    console.log(`Returning all ${items.length} menu items (no filtering)`);
+    return items;
   }
   async getMenuItem(id) {
     const item = await this.menuItems.findOne({ id });
@@ -171,7 +231,11 @@ var MongoStorage = class {
       id,
       available: insertItem.available ?? true
     };
+    console.log("Creating menu item in MongoDB:", item);
     await this.menuItems.insertOne(item);
+    console.log("Menu item inserted successfully with ID:", id);
+    const verifyItem = await this.menuItems.findOne({ id });
+    console.log("Verification - Item found in DB:", verifyItem ? "Yes" : "No");
     return item;
   }
   async updateMenuItem(id, updateData) {
@@ -181,6 +245,18 @@ var MongoStorage = class {
       { returnDocument: "after" }
     );
     return result || void 0;
+  }
+  async deleteMenuItem(id) {
+    const result = await this.menuItems.deleteOne({ id });
+    return result.deletedCount > 0;
+  }
+  async deleteMenuItems(ids) {
+    const result = await this.menuItems.deleteMany({ id: { $in: ids } });
+    return result.deletedCount;
+  }
+  async deleteAllMenuItems() {
+    const result = await this.menuItems.deleteMany({});
+    return result.deletedCount;
   }
   // Transactions
   async createTransaction(insertTransaction) {
@@ -384,17 +460,78 @@ var MongoStorage = class {
   }
   // Clear data methods
   async clearDataByDay(date) {
+    const dailySummary = await this.getDailySummary(date);
     await this.transactions.deleteMany({ date });
+    const inventorySession = await this.getInventorySessionByDate(date);
+    if (inventorySession) {
+      await this.inventoryItems.deleteMany({ sessionId: inventorySession.id });
+      await this.inventorySessions.deleteOne({ id: inventorySession.id });
+    }
+    if (dailySummary) {
+      const weekStart = this.getWeekStart(new Date(date));
+      const existingWeekly = await this.getWeeklySummary(weekStart);
+      if (existingWeekly) {
+        existingWeekly.totalAmount = (parseFloat(existingWeekly.totalAmount) - parseFloat(dailySummary.totalAmount)).toFixed(2);
+        existingWeekly.gpayAmount = (parseFloat(existingWeekly.gpayAmount) - parseFloat(dailySummary.gpayAmount)).toFixed(2);
+        existingWeekly.cashAmount = (parseFloat(existingWeekly.cashAmount) - parseFloat(dailySummary.cashAmount)).toFixed(2);
+        existingWeekly.orderCount -= dailySummary.orderCount;
+        await this.weeklySummaries.updateOne(
+          { weekStart },
+          { $set: existingWeekly }
+        );
+      }
+      const month = date.substring(0, 7);
+      const existingMonthly = await this.getMonthlySummary(month);
+      if (existingMonthly) {
+        existingMonthly.totalAmount = (parseFloat(existingMonthly.totalAmount) - parseFloat(dailySummary.totalAmount)).toFixed(2);
+        existingMonthly.gpayAmount = (parseFloat(existingMonthly.gpayAmount) - parseFloat(dailySummary.gpayAmount)).toFixed(2);
+        existingMonthly.cashAmount = (parseFloat(existingMonthly.cashAmount) - parseFloat(dailySummary.cashAmount)).toFixed(2);
+        existingMonthly.orderCount -= dailySummary.orderCount;
+        await this.monthlySummaries.updateOne(
+          { month },
+          { $set: existingMonthly }
+        );
+      }
+    }
     await this.dailySummaries.deleteOne({ date });
   }
   async clearDataByWeek(weekStart) {
     const weekEnd = this.getWeekEnd(new Date(weekStart));
+    const weeklySummary = await this.getWeeklySummary(weekStart);
     await this.transactions.deleteMany({
       date: {
         $gte: weekStart,
         $lte: weekEnd
       }
     });
+    const dates = this.getDatesBetween(weekStart, weekEnd);
+    for (const date of dates) {
+      const inventorySession = await this.getInventorySessionByDate(date);
+      if (inventorySession) {
+        await this.inventoryItems.deleteMany({ sessionId: inventorySession.id });
+        await this.inventorySessions.deleteOne({ id: inventorySession.id });
+      }
+    }
+    await this.dailySummaries.deleteMany({
+      date: {
+        $gte: weekStart,
+        $lte: weekEnd
+      }
+    });
+    if (weeklySummary) {
+      const month = weekStart.substring(0, 7);
+      const existingMonthly = await this.getMonthlySummary(month);
+      if (existingMonthly) {
+        existingMonthly.totalAmount = (parseFloat(existingMonthly.totalAmount) - parseFloat(weeklySummary.totalAmount)).toFixed(2);
+        existingMonthly.gpayAmount = (parseFloat(existingMonthly.gpayAmount) - parseFloat(weeklySummary.gpayAmount)).toFixed(2);
+        existingMonthly.cashAmount = (parseFloat(existingMonthly.cashAmount) - parseFloat(weeklySummary.cashAmount)).toFixed(2);
+        existingMonthly.orderCount -= weeklySummary.orderCount;
+        await this.monthlySummaries.updateOne(
+          { month },
+          { $set: existingMonthly }
+        );
+      }
+    }
     await this.weeklySummaries.deleteOne({ weekStart });
   }
   async clearDataByMonth(month) {
@@ -406,7 +543,111 @@ var MongoStorage = class {
         $lte: endDate
       }
     });
+    const dates = this.getDatesBetween(startDate, endDate);
+    for (const date of dates) {
+      const inventorySession = await this.getInventorySessionByDate(date);
+      if (inventorySession) {
+        await this.inventoryItems.deleteMany({ sessionId: inventorySession.id });
+        await this.inventorySessions.deleteOne({ id: inventorySession.id });
+      }
+    }
+    await this.dailySummaries.deleteMany({
+      date: {
+        $gte: startDate,
+        $lte: endDate
+      }
+    });
+    await this.weeklySummaries.deleteMany({
+      weekStart: {
+        $gte: startDate,
+        $lte: endDate
+      }
+    });
     await this.monthlySummaries.deleteOne({ month });
+  }
+  // Inventory methods
+  async createInventorySession(session) {
+    const id = (/* @__PURE__ */ new Date()).getTime().toString();
+    const inventorySession = {
+      ...session,
+      id,
+      createdAt: /* @__PURE__ */ new Date()
+    };
+    await this.inventorySessions.insertOne(inventorySession);
+    return inventorySession;
+  }
+  async getInventorySessionByDate(date) {
+    const session = await this.inventorySessions.findOne({ date });
+    return session || void 0;
+  }
+  async getInventorySessions() {
+    return await this.inventorySessions.find({}).sort({ startTime: -1 }).toArray();
+  }
+  async updateInventorySession(id, updates) {
+    const result = await this.inventorySessions.findOneAndUpdate(
+      { id },
+      { $set: updates },
+      { returnDocument: "after" }
+    );
+    return result || void 0;
+  }
+  async createInventoryItem(item) {
+    const id = (/* @__PURE__ */ new Date()).getTime().toString() + Math.random().toString(36).substr(2, 9);
+    const inventoryItem = {
+      ...item,
+      id,
+      createdAt: /* @__PURE__ */ new Date()
+    };
+    await this.inventoryItems.insertOne(inventoryItem);
+    return inventoryItem;
+  }
+  async getInventoryItemsBySession(sessionId) {
+    return await this.inventoryItems.find({ sessionId }).toArray();
+  }
+  async updateInventoryItem(id, updates) {
+    const result = await this.inventoryItems.findOneAndUpdate(
+      { id },
+      { $set: updates },
+      { returnDocument: "after" }
+    );
+    return result || void 0;
+  }
+  async getInventoryItemsWithMenu(sessionId) {
+    const items = await this.getInventoryItemsBySession(sessionId);
+    const result = [];
+    for (const item of items) {
+      const menuItem = await this.getMenuItem(item.menuItemId);
+      if (menuItem) {
+        result.push({ ...item, menuItem });
+      }
+    }
+    return result;
+  }
+  async calculateStockOutForSession(sessionId, date) {
+    const transactions2 = await this.getTransactionsByDate(date);
+    const inventoryItems2 = await this.getInventoryItemsBySession(sessionId);
+    for (const inventoryItem of inventoryItems2) {
+      let stockOut = 0;
+      for (const transaction of transactions2) {
+        const items = transaction.items;
+        const soldItem = items.find((i) => i.id === inventoryItem.menuItemId);
+        if (soldItem) {
+          stockOut += soldItem.quantity;
+        }
+      }
+      const stockLeft = inventoryItem.stockIn - stockOut;
+      await this.updateInventoryItem(inventoryItem.id, {
+        stockOut,
+        stockLeft
+      });
+    }
+  }
+  async clearInventoryByDate(date) {
+    const inventorySession = await this.getInventorySessionByDate(date);
+    if (inventorySession) {
+      await this.inventoryItems.deleteMany({ sessionId: inventorySession.id });
+      await this.inventorySessions.deleteOne({ id: inventorySession.id });
+    }
   }
 };
 
@@ -414,20 +655,27 @@ var MongoStorage = class {
 dotenv.config();
 var MemStorage = class {
   users;
+  categories;
   menuItems;
   transactions;
   dailySummaries;
   weeklySummaries;
   monthlySummaries;
+  inventorySessions;
+  inventoryItems;
   constructor() {
     this.users = /* @__PURE__ */ new Map();
+    this.categories = /* @__PURE__ */ new Map();
     this.menuItems = /* @__PURE__ */ new Map();
     this.transactions = /* @__PURE__ */ new Map();
     this.dailySummaries = /* @__PURE__ */ new Map();
     this.weeklySummaries = /* @__PURE__ */ new Map();
     this.monthlySummaries = /* @__PURE__ */ new Map();
+    this.inventorySessions = /* @__PURE__ */ new Map();
+    this.inventoryItems = /* @__PURE__ */ new Map();
     this.createUser({ username: "admin", password: "admin@2020" });
     this.createUser({ username: "Chai-fi", password: "Chai-fi@2025" });
+    this.initializeCategories();
     this.initializeMenuItems();
   }
   async initializeMenuItems() {
@@ -516,9 +764,56 @@ var MemStorage = class {
     this.users.set(id, user);
     return user;
   }
+  // Categories
+  async initializeCategories() {
+    const defaultCategories = [
+      { name: "Tea", subCategories: [] },
+      { name: "Coffee", subCategories: [] },
+      { name: "Snacks", subCategories: [] },
+      { name: "Beverages", subCategories: [] }
+    ];
+    for (const category of defaultCategories) {
+      await this.createCategory(category);
+    }
+  }
+  async getCategories() {
+    return Array.from(this.categories.values());
+  }
+  async getCategory(id) {
+    return this.categories.get(id);
+  }
+  async getCategoryByName(name) {
+    return Array.from(this.categories.values()).find(
+      (category) => category.name === name
+    );
+  }
+  async createCategory(insertCategory) {
+    const id = randomUUID();
+    const category = {
+      ...insertCategory,
+      id,
+      createdAt: /* @__PURE__ */ new Date(),
+      subCategories: insertCategory.subCategories || []
+    };
+    this.categories.set(id, category);
+    return category;
+  }
+  async updateCategory(id, updateData) {
+    const existing = this.categories.get(id);
+    if (!existing) return void 0;
+    const updated = { ...existing, ...updateData };
+    this.categories.set(id, updated);
+    return updated;
+  }
+  async deleteCategory(id) {
+    return this.categories.delete(id);
+  }
   // Menu Items
   async getMenuItems() {
-    return Array.from(this.menuItems.values());
+    const items = Array.from(this.menuItems.values());
+    console.log(`Total items in MemStorage: ${items.length}`);
+    console.log(`Returning all ${items.length} menu items (no filtering)`);
+    return items;
   }
   async getMenuItem(id) {
     return this.menuItems.get(id);
@@ -526,7 +821,9 @@ var MemStorage = class {
   async createMenuItem(insertItem) {
     const id = randomUUID();
     const item = { ...insertItem, id, available: insertItem.available ?? true };
+    console.log("Creating menu item in MemStorage:", item);
     this.menuItems.set(id, item);
+    console.log("Menu item stored successfully with ID:", id);
     return item;
   }
   async updateMenuItem(id, updateData) {
@@ -535,6 +832,23 @@ var MemStorage = class {
     const updated = { ...existing, ...updateData };
     this.menuItems.set(id, updated);
     return updated;
+  }
+  async deleteMenuItem(id) {
+    return this.menuItems.delete(id);
+  }
+  async deleteMenuItems(ids) {
+    let deletedCount = 0;
+    for (const id of ids) {
+      if (this.menuItems.delete(id)) {
+        deletedCount++;
+      }
+    }
+    return deletedCount;
+  }
+  async deleteAllMenuItems() {
+    const count = this.menuItems.size;
+    this.menuItems.clear();
+    return count;
   }
   // Transactions
   async createTransaction(insertTransaction) {
@@ -695,16 +1009,63 @@ var MemStorage = class {
   }
   // Clear data methods
   async clearDataByDay(date) {
+    const dailySummary = await this.getDailySummary(date);
     const transactionsToDelete = Array.from(this.transactions.entries()).filter(([_, transaction]) => transaction.date === date).map(([id, _]) => id);
     transactionsToDelete.forEach((id) => this.transactions.delete(id));
+    const inventorySession = await this.getInventorySessionByDate(date);
+    if (inventorySession) {
+      const itemsToDelete = Array.from(this.inventoryItems.entries()).filter(([_, item]) => item.sessionId === inventorySession.id).map(([id, _]) => id);
+      itemsToDelete.forEach((id) => this.inventoryItems.delete(id));
+      this.inventorySessions.delete(inventorySession.id);
+    }
+    if (dailySummary) {
+      const weekStart = this.getWeekStart(new Date(date));
+      const existingWeekly = await this.getWeeklySummary(weekStart);
+      if (existingWeekly) {
+        existingWeekly.totalAmount = (parseFloat(existingWeekly.totalAmount) - parseFloat(dailySummary.totalAmount)).toFixed(2);
+        existingWeekly.gpayAmount = (parseFloat(existingWeekly.gpayAmount) - parseFloat(dailySummary.gpayAmount)).toFixed(2);
+        existingWeekly.cashAmount = (parseFloat(existingWeekly.cashAmount) - parseFloat(dailySummary.cashAmount)).toFixed(2);
+        existingWeekly.orderCount -= dailySummary.orderCount;
+        this.weeklySummaries.set(weekStart, existingWeekly);
+      }
+      const month = date.substring(0, 7);
+      const existingMonthly = await this.getMonthlySummary(month);
+      if (existingMonthly) {
+        existingMonthly.totalAmount = (parseFloat(existingMonthly.totalAmount) - parseFloat(dailySummary.totalAmount)).toFixed(2);
+        existingMonthly.gpayAmount = (parseFloat(existingMonthly.gpayAmount) - parseFloat(dailySummary.gpayAmount)).toFixed(2);
+        existingMonthly.cashAmount = (parseFloat(existingMonthly.cashAmount) - parseFloat(dailySummary.cashAmount)).toFixed(2);
+        existingMonthly.orderCount -= dailySummary.orderCount;
+        this.monthlySummaries.set(month, existingMonthly);
+      }
+    }
     this.dailySummaries.delete(date);
   }
   async clearDataByWeek(weekStart) {
     const weekEnd = this.getWeekEnd(new Date(weekStart));
+    const weeklySummary = await this.getWeeklySummary(weekStart);
     const transactionsToDelete = Array.from(this.transactions.entries()).filter(([_, transaction]) => transaction.date >= weekStart && transaction.date <= weekEnd).map(([id, _]) => id);
     transactionsToDelete.forEach((id) => this.transactions.delete(id));
-    this.weeklySummaries.delete(weekStart);
     const dates = this.getDatesBetween(weekStart, weekEnd);
+    for (const date of dates) {
+      const inventorySession = await this.getInventorySessionByDate(date);
+      if (inventorySession) {
+        const itemsToDelete = Array.from(this.inventoryItems.entries()).filter(([_, item]) => item.sessionId === inventorySession.id).map(([id, _]) => id);
+        itemsToDelete.forEach((id) => this.inventoryItems.delete(id));
+        this.inventorySessions.delete(inventorySession.id);
+      }
+    }
+    if (weeklySummary) {
+      const month = weekStart.substring(0, 7);
+      const existingMonthly = await this.getMonthlySummary(month);
+      if (existingMonthly) {
+        existingMonthly.totalAmount = (parseFloat(existingMonthly.totalAmount) - parseFloat(weeklySummary.totalAmount)).toFixed(2);
+        existingMonthly.gpayAmount = (parseFloat(existingMonthly.gpayAmount) - parseFloat(weeklySummary.gpayAmount)).toFixed(2);
+        existingMonthly.cashAmount = (parseFloat(existingMonthly.cashAmount) - parseFloat(weeklySummary.cashAmount)).toFixed(2);
+        existingMonthly.orderCount -= weeklySummary.orderCount;
+        this.monthlySummaries.set(month, existingMonthly);
+      }
+    }
+    this.weeklySummaries.delete(weekStart);
     dates.forEach((date) => this.dailySummaries.delete(date));
   }
   async clearDataByMonth(month) {
@@ -712,8 +1073,16 @@ var MemStorage = class {
     const endDate = `${month}-31`;
     const transactionsToDelete = Array.from(this.transactions.entries()).filter(([_, transaction]) => transaction.date >= startDate && transaction.date <= endDate).map(([id, _]) => id);
     transactionsToDelete.forEach((id) => this.transactions.delete(id));
-    this.monthlySummaries.delete(month);
     const dates = this.getDatesBetween(startDate, endDate);
+    for (const date of dates) {
+      const inventorySession = await this.getInventorySessionByDate(date);
+      if (inventorySession) {
+        const itemsToDelete = Array.from(this.inventoryItems.entries()).filter(([_, item]) => item.sessionId === inventorySession.id).map(([id, _]) => id);
+        itemsToDelete.forEach((id) => this.inventoryItems.delete(id));
+        this.inventorySessions.delete(inventorySession.id);
+      }
+    }
+    this.monthlySummaries.delete(month);
     dates.forEach((date) => this.dailySummaries.delete(date));
     const weeklySummariesToDelete = Array.from(this.weeklySummaries.entries()).filter(([weekStart, _]) => weekStart >= startDate && weekStart <= endDate).map(([weekStart, _]) => weekStart);
     weeklySummariesToDelete.forEach((weekStart) => this.weeklySummaries.delete(weekStart));
@@ -728,32 +1097,126 @@ var MemStorage = class {
     }
     return dates;
   }
+  // Inventory methods
+  async createInventorySession(session) {
+    const id = randomUUID();
+    const inventorySession = {
+      ...session,
+      id,
+      createdAt: /* @__PURE__ */ new Date()
+    };
+    this.inventorySessions.set(id, inventorySession);
+    return inventorySession;
+  }
+  async getInventorySessionByDate(date) {
+    return Array.from(this.inventorySessions.values()).find(
+      (session) => session.date === date
+    );
+  }
+  async getInventorySessions() {
+    return Array.from(this.inventorySessions.values()).sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+  }
+  async updateInventorySession(id, updates) {
+    const existing = this.inventorySessions.get(id);
+    if (!existing) return void 0;
+    const updated = { ...existing, ...updates };
+    this.inventorySessions.set(id, updated);
+    return updated;
+  }
+  async createInventoryItem(item) {
+    const id = randomUUID();
+    const inventoryItem = {
+      ...item,
+      id,
+      createdAt: /* @__PURE__ */ new Date()
+    };
+    this.inventoryItems.set(id, inventoryItem);
+    return inventoryItem;
+  }
+  async getInventoryItemsBySession(sessionId) {
+    return Array.from(this.inventoryItems.values()).filter((item) => item.sessionId === sessionId);
+  }
+  async updateInventoryItem(id, updates) {
+    const existing = this.inventoryItems.get(id);
+    if (!existing) return void 0;
+    const updated = { ...existing, ...updates };
+    this.inventoryItems.set(id, updated);
+    return updated;
+  }
+  async getInventoryItemsWithMenu(sessionId) {
+    const items = await this.getInventoryItemsBySession(sessionId);
+    const result = [];
+    for (const item of items) {
+      const menuItem = await this.getMenuItem(item.menuItemId);
+      if (menuItem) {
+        result.push({ ...item, menuItem });
+      }
+    }
+    return result;
+  }
+  async calculateStockOutForSession(sessionId, date) {
+    const transactions2 = await this.getTransactionsByDate(date);
+    const inventoryItems2 = await this.getInventoryItemsBySession(sessionId);
+    for (const inventoryItem of inventoryItems2) {
+      let stockOut = 0;
+      for (const transaction of transactions2) {
+        const items = transaction.items;
+        const soldItem = items.find((i) => i.id === inventoryItem.menuItemId);
+        if (soldItem) {
+          stockOut += soldItem.quantity;
+        }
+      }
+      const stockLeft = inventoryItem.stockIn - stockOut;
+      await this.updateInventoryItem(inventoryItem.id, {
+        stockOut,
+        stockLeft
+      });
+    }
+  }
+  async clearInventoryByDate(date) {
+    const inventorySession = await this.getInventorySessionByDate(date);
+    if (inventorySession) {
+      const itemsToDelete = Array.from(this.inventoryItems.entries()).filter(([_, item]) => item.sessionId === inventorySession.id).map(([id, _]) => id);
+      itemsToDelete.forEach((id) => this.inventoryItems.delete(id));
+      this.inventorySessions.delete(inventorySession.id);
+    }
+  }
 };
 var storageInstance;
 var mongoConnectionString = process.env.MONGODB_URI || process.env.DATABASE_URL;
 var storage;
+var storageInitialized = false;
+var storageInitPromise = null;
 if (mongoConnectionString && mongoConnectionString.includes("mongodb")) {
-  console.log("\u{1F504} Initializing MongoDB Atlas storage...");
-  (async () => {
+  console.log("  Initializing MongoDB Atlas storage...");
+  storage = new MemStorage();
+  storageInstance = storage;
+  storageInitPromise = (async () => {
     try {
       const mongoStorage = new MongoStorage(mongoConnectionString);
       await mongoStorage.connect();
       storage = mongoStorage;
       storageInstance = mongoStorage;
-      console.log("\u2705 MongoDB Atlas storage initialized successfully");
+      storageInitialized = true;
+      console.log(" MongoDB Atlas storage initialized successfully");
     } catch (error) {
       console.error("\u274C MongoDB Atlas initialization failed:", error);
-      console.log("\u{1F504} Falling back to in-memory storage...");
-      storage = new MemStorage();
-      storageInstance = storage;
-      console.log("\u2705 Fallback in-memory storage initialized");
+      console.log("  Using in-memory storage...");
+      storageInitialized = true;
     }
   })();
 } else {
   console.log("\u{1F4DD} MongoDB connection string not provided, using in-memory storage");
   storage = new MemStorage();
   storageInstance = storage;
-  console.log("\u2705 In-memory storage initialized");
+  storageInitialized = true;
+  console.log(" In-memory storage initialized");
+}
+async function waitForStorage() {
+  if (storageInitPromise) {
+    await storageInitPromise;
+  }
+  return storage;
 }
 process.on("SIGINT", async () => {
   if (storageInstance && "disconnect" in storageInstance) {
@@ -777,12 +1240,20 @@ var users = pgTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull()
 });
+var categories = pgTable("categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  subCategories: jsonb("sub_categories").default([]),
+  // Array of strings
+  createdAt: timestamp("created_at").notNull().default(sql`now()`)
+});
 var menuItems = pgTable("menu_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description").notNull(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   category: text("category").notNull(),
+  subCategory: text("sub_category"),
   image: text("image").notNull(),
   available: boolean("available").notNull().default(true)
 });
@@ -839,8 +1310,31 @@ var monthlySummaries = pgTable("monthly_summaries", {
   orderCount: integer("order_count").notNull(),
   createdAt: timestamp("created_at").notNull().default(sql`now()`)
 });
+var inventorySessions = pgTable("inventory_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: text("date").notNull(),
+  // YYYY-MM-DD format
+  status: text("status").notNull(),
+  // 'pre-billing', 'billing', 'ended'
+  startTime: timestamp("start_time").notNull().default(sql`now()`),
+  endTime: timestamp("end_time"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`)
+});
+var inventoryItems = pgTable("inventory_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull(),
+  menuItemId: varchar("menu_item_id").notNull(),
+  stockIn: integer("stock_in").notNull(),
+  stockOut: integer("stock_out").notNull().default(0),
+  stockLeft: integer("stock_left").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`)
+});
 var insertUserSchema = createInsertSchema(users).omit({
   id: true
+});
+var insertCategorySchema = createInsertSchema(categories).omit({
+  id: true,
+  createdAt: true
 });
 var insertMenuItemSchema = createInsertSchema(menuItems).omit({
   id: true
@@ -861,6 +1355,14 @@ var insertMonthlySummarySchema = createInsertSchema(monthlySummaries).omit({
   id: true,
   createdAt: true
 });
+var insertInventorySessionSchema = createInsertSchema(inventorySessions).omit({
+  id: true,
+  createdAt: true
+});
+var insertInventoryItemSchema = createInsertSchema(inventoryItems).omit({
+  id: true,
+  createdAt: true
+});
 
 // server/routes.ts
 import { z } from "zod";
@@ -868,10 +1370,8 @@ async function registerRoutes(app2) {
   app2.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
-      if (!storage) {
-        return res.status(503).json({ error: "Service temporarily unavailable" });
-      }
-      const user = await storage.getUserByUsername(username);
+      const currentStorage = await waitForStorage();
+      const user = await currentStorage.getUserByUsername(username);
       if (!user || user.password !== password) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
@@ -881,16 +1381,77 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: "Login failed" });
     }
   });
+  app2.get("/api/categories", async (req, res) => {
+    try {
+      const currentStorage = await waitForStorage();
+      const categories2 = await currentStorage.getCategories();
+      res.json(categories2);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      res.status(500).json({ error: "Failed to fetch categories" });
+    }
+  });
+  app2.post("/api/categories", async (req, res) => {
+    try {
+      const currentStorage = await waitForStorage();
+      const { name, subCategories } = req.body;
+      const existing = await currentStorage.getCategoryByName(name);
+      if (existing) {
+        return res.status(400).json({ error: "Category already exists" });
+      }
+      const newCategory = await currentStorage.createCategory({
+        name,
+        subCategories: subCategories || []
+      });
+      res.json(newCategory);
+    } catch (error) {
+      console.error("Error creating category:", error);
+      res.status(500).json({ error: "Failed to create category" });
+    }
+  });
+  app2.put("/api/categories/:id", async (req, res) => {
+    try {
+      const currentStorage = await waitForStorage();
+      const { name, subCategories } = req.body;
+      const updatedCategory = await currentStorage.updateCategory(req.params.id, {
+        name,
+        subCategories
+      });
+      if (!updatedCategory) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      res.json(updatedCategory);
+    } catch (error) {
+      console.error("Error updating category:", error);
+      res.status(500).json({ error: "Failed to update category" });
+    }
+  });
+  app2.delete("/api/categories/:id", async (req, res) => {
+    try {
+      const currentStorage = await waitForStorage();
+      const success = await currentStorage.deleteCategory(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      res.json({ message: "Category deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      res.status(500).json({ error: "Failed to delete category" });
+    }
+  });
   app2.get("/api/menu", async (req, res) => {
     try {
-      const items = await storage.getMenuItems();
+      const currentStorage = await waitForStorage();
+      const items = await currentStorage.getMenuItems();
       res.json(items);
     } catch (error) {
+      console.error("Error fetching menu items:", error);
       res.status(500).json({ error: "Failed to fetch menu items" });
     }
   });
   app2.get("/api/menu/sales", async (req, res) => {
     try {
+      const currentStorage = await waitForStorage();
       let startDate, endDate;
       if (req.query.date) {
         startDate = req.query.date;
@@ -902,8 +1463,8 @@ async function registerRoutes(app2) {
         startDate = new Date(year, monthNum, 1).toISOString().split("T")[0];
         endDate = new Date(year, monthNum + 1, 0).toISOString().split("T")[0];
       }
-      const transactions2 = await storage.getTransactionsByDateRange(startDate, endDate);
-      const menuItems2 = await storage.getMenuItems();
+      const transactions2 = await currentStorage.getTransactionsByDateRange(startDate, endDate);
+      const menuItems2 = await currentStorage.getMenuItems();
       const salesData = menuItems2.map((item) => {
         const totalSold = transactions2.reduce((count, transaction) => {
           const items = transaction.items;
@@ -926,7 +1487,8 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/menu/:id", async (req, res) => {
     try {
-      const item = await storage.getMenuItem(req.params.id);
+      const currentStorage = await waitForStorage();
+      const item = await currentStorage.getMenuItem(req.params.id);
       if (!item) {
         return res.status(404).json({ error: "Menu item not found" });
       }
@@ -937,28 +1499,37 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/menu", async (req, res) => {
     try {
-      const { name, description, price, category, image, available } = req.body;
-      const newItem = await storage.createMenuItem({
-        name,
-        description,
-        price,
-        category,
-        image,
+      const currentStorage = await waitForStorage();
+      const { name, description, price, category, subCategory, image, available } = req.body;
+      if (!name || !name.trim()) {
+        return res.status(400).json({ error: "Menu item name is required" });
+      }
+      const newItem = await currentStorage.createMenuItem({
+        name: name?.trim() || "",
+        description: description?.trim() || "",
+        price: price?.trim() || "",
+        category: category?.trim() || "",
+        subCategory: subCategory?.trim() || void 0,
+        image: image?.trim() || "",
         available: available ?? true
       });
+      console.log("Menu item created:", newItem);
       res.json(newItem);
     } catch (error) {
+      console.error("Error creating menu item:", error);
       res.status(500).json({ error: "Failed to create menu item" });
     }
   });
   app2.put("/api/menu/:id", async (req, res) => {
     try {
-      const { name, description, price, category, image, available } = req.body;
-      const updatedItem = await storage.updateMenuItem(req.params.id, {
+      const currentStorage = await waitForStorage();
+      const { name, description, price, category, subCategory, image, available } = req.body;
+      const updatedItem = await currentStorage.updateMenuItem(req.params.id, {
         name,
         description,
         price,
         category,
+        subCategory,
         image,
         available
       });
@@ -972,20 +1543,57 @@ async function registerRoutes(app2) {
   });
   app2.delete("/api/menu/:id", async (req, res) => {
     try {
-      const item = await storage.getMenuItem(req.params.id);
+      const currentStorage = await waitForStorage();
+      const item = await currentStorage.getMenuItem(req.params.id);
       if (!item) {
         return res.status(404).json({ error: "Menu item not found" });
       }
-      const updatedItem = await storage.updateMenuItem(req.params.id, { available: false });
-      res.json({ message: "Menu item marked as unavailable", item: updatedItem });
+      const success = await currentStorage.deleteMenuItem(req.params.id);
+      if (success) {
+        res.json({ message: "Menu item deleted successfully" });
+      } else {
+        res.status(500).json({ error: "Failed to delete menu item" });
+      }
     } catch (error) {
+      console.error("Error deleting menu item:", error);
       res.status(500).json({ error: "Failed to delete menu item" });
+    }
+  });
+  app2.post("/api/menu/bulk-delete", async (req, res) => {
+    try {
+      const currentStorage = await waitForStorage();
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "Invalid or empty ids array" });
+      }
+      const deletedCount = await currentStorage.deleteMenuItems(ids);
+      res.json({
+        message: `${deletedCount} menu item(s) deleted successfully`,
+        deletedCount
+      });
+    } catch (error) {
+      console.error("Error bulk deleting menu items:", error);
+      res.status(500).json({ error: "Failed to delete menu items" });
+    }
+  });
+  app2.delete("/api/menu", async (req, res) => {
+    try {
+      const currentStorage = await waitForStorage();
+      const deletedCount = await currentStorage.deleteAllMenuItems();
+      res.json({
+        message: `All ${deletedCount} menu items deleted successfully`,
+        deletedCount
+      });
+    } catch (error) {
+      console.error("Error deleting all menu items:", error);
+      res.status(500).json({ error: "Failed to delete all menu items" });
     }
   });
   app2.post("/api/transactions", async (req, res) => {
     try {
+      const currentStorage = await waitForStorage();
       const validatedData = insertTransactionSchema.parse(req.body);
-      const transaction = await storage.createTransaction(validatedData);
+      const transaction = await currentStorage.createTransaction(validatedData);
       res.json(transaction);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -996,8 +1604,9 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/transactions", async (req, res) => {
     try {
+      const currentStorage = await waitForStorage();
       const limit = req.query.limit ? parseInt(req.query.limit) : void 0;
-      const transactions2 = await storage.getTransactions(limit);
+      const transactions2 = await currentStorage.getTransactions(limit);
       res.json(transactions2);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch transactions" });
@@ -1005,7 +1614,8 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/transactions/date/:date", async (req, res) => {
     try {
-      const transactions2 = await storage.getTransactionsByDate(req.params.date);
+      const currentStorage = await waitForStorage();
+      const transactions2 = await currentStorage.getTransactionsByDate(req.params.date);
       res.json(transactions2);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch transactions for date" });
@@ -1013,8 +1623,9 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/summaries/daily", async (req, res) => {
     try {
+      const currentStorage = await waitForStorage();
       const limit = req.query.limit ? parseInt(req.query.limit) : void 0;
-      const summaries = await storage.getDailySummaries(limit);
+      const summaries = await currentStorage.getDailySummaries(limit);
       res.json(summaries);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch daily summaries" });
@@ -1022,7 +1633,8 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/summaries/daily/:date", async (req, res) => {
     try {
-      const summary = await storage.getDailySummary(req.params.date);
+      const currentStorage = await waitForStorage();
+      const summary = await currentStorage.getDailySummary(req.params.date);
       if (!summary) {
         return res.status(404).json({ error: "Daily summary not found" });
       }
@@ -1033,8 +1645,9 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/summaries/weekly", async (req, res) => {
     try {
+      const currentStorage = await waitForStorage();
       const limit = req.query.limit ? parseInt(req.query.limit) : void 0;
-      const summaries = await storage.getWeeklySummaries(limit);
+      const summaries = await currentStorage.getWeeklySummaries(limit);
       res.json(summaries);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch weekly summaries" });
@@ -1042,8 +1655,9 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/summaries/monthly", async (req, res) => {
     try {
+      const currentStorage = await waitForStorage();
       const limit = req.query.limit ? parseInt(req.query.limit) : void 0;
-      const summaries = await storage.getMonthlySummaries(limit);
+      const summaries = await currentStorage.getMonthlySummaries(limit);
       res.json(summaries);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch monthly summaries" });
@@ -1051,15 +1665,16 @@ async function registerRoutes(app2) {
   });
   app2.delete("/api/data/clear", async (req, res) => {
     try {
+      const currentStorage = await waitForStorage();
       const { period, date } = req.query;
       if (period === "day" && date) {
-        await storage.clearDataByDay(date);
+        await currentStorage.clearDataByDay(date);
         res.json({ message: `Cleared data for ${date}` });
       } else if (period === "week" && date) {
-        await storage.clearDataByWeek(date);
+        await currentStorage.clearDataByWeek(date);
         res.json({ message: `Cleared weekly data starting ${date}` });
       } else if (period === "month" && date) {
-        await storage.clearDataByMonth(date);
+        await currentStorage.clearDataByMonth(date);
         res.json({ message: `Cleared monthly data for ${date}` });
       } else {
         res.status(400).json({ error: "Invalid parameters. Required: period (day/week/month) and date" });
@@ -1071,8 +1686,9 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/download/daily/:date", async (req, res) => {
     try {
-      const summary = await storage.getDailySummary(req.params.date);
-      const transactions2 = await storage.getTransactionsByDate(req.params.date);
+      const currentStorage = await waitForStorage();
+      const summary = await currentStorage.getDailySummary(req.params.date);
+      const transactions2 = await currentStorage.getTransactionsByDate(req.params.date);
       if (!summary) {
         return res.status(404).json({ error: "Daily summary not found" });
       }
@@ -1083,11 +1699,12 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/download/weekly/:weekStart", async (req, res) => {
     try {
-      const summary = await storage.getWeeklySummary(req.params.weekStart);
+      const currentStorage = await waitForStorage();
+      const summary = await currentStorage.getWeeklySummary(req.params.weekStart);
       if (!summary) {
         return res.status(404).json({ error: "Weekly summary not found" });
       }
-      const transactions2 = await storage.getTransactionsByDateRange(
+      const transactions2 = await currentStorage.getTransactionsByDateRange(
         summary.weekStart,
         summary.weekEnd
       );
@@ -1098,16 +1715,170 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/download/monthly/:month", async (req, res) => {
     try {
-      const summary = await storage.getMonthlySummary(req.params.month);
+      const currentStorage = await waitForStorage();
+      const summary = await currentStorage.getMonthlySummary(req.params.month);
       if (!summary) {
         return res.status(404).json({ error: "Monthly summary not found" });
       }
       const startDate = `${req.params.month}-01`;
       const endDate = `${req.params.month}-31`;
-      const transactions2 = await storage.getTransactionsByDateRange(startDate, endDate);
+      const transactions2 = await currentStorage.getTransactionsByDateRange(startDate, endDate);
       res.json({ summary, transactions: transactions2 });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch monthly data" });
+    }
+  });
+  app2.get("/api/inventory/session/current", async (req, res) => {
+    try {
+      const currentStorage = await waitForStorage();
+      const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+      const session = await currentStorage.getInventorySessionByDate(today);
+      if (!session) {
+        return res.status(404).json({ error: "No active session for today" });
+      }
+      res.json(session);
+    } catch (error) {
+      console.error("Get current session error:", error);
+      res.status(500).json({ error: "Failed to fetch current session" });
+    }
+  });
+  app2.get("/api/inventory/items/:sessionId", async (req, res) => {
+    try {
+      const currentStorage = await waitForStorage();
+      const items = await currentStorage.getInventoryItemsWithMenu(req.params.sessionId);
+      res.json(items);
+    } catch (error) {
+      console.error("Get inventory items error:", error);
+      res.status(500).json({ error: "Failed to fetch inventory items" });
+    }
+  });
+  app2.post("/api/inventory/start", async (req, res) => {
+    try {
+      const currentStorage = await waitForStorage();
+      const { items } = req.body;
+      const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+      const existingSession = await currentStorage.getInventorySessionByDate(today);
+      if (existingSession) {
+        return res.status(400).json({ error: "Inventory session already exists for today" });
+      }
+      const session = await currentStorage.createInventorySession({
+        date: today,
+        status: "billing",
+        startTime: /* @__PURE__ */ new Date()
+      });
+      for (const item of items) {
+        await currentStorage.createInventoryItem({
+          sessionId: session.id,
+          menuItemId: item.menuItemId,
+          stockIn: item.stockIn,
+          stockOut: 0,
+          stockLeft: item.stockIn
+        });
+      }
+      res.json({ session, message: "Inventory day started successfully" });
+    } catch (error) {
+      console.error("Start inventory error:", error);
+      res.status(500).json({ error: "Failed to start inventory day" });
+    }
+  });
+  app2.post("/api/inventory/end", async (req, res) => {
+    try {
+      const currentStorage = await waitForStorage();
+      const { sessionId } = req.body;
+      const session = await currentStorage.getInventorySessionByDate(
+        (/* @__PURE__ */ new Date()).toISOString().split("T")[0]
+      );
+      if (!session) {
+        return res.status(404).json({ error: "No active session found" });
+      }
+      if (session.status === "ended") {
+        return res.status(400).json({ error: "Session already ended" });
+      }
+      await currentStorage.calculateStockOutForSession(session.id, session.date);
+      await currentStorage.updateInventorySession(session.id, {
+        status: "ended",
+        endTime: /* @__PURE__ */ new Date()
+      });
+      res.json({ message: "Inventory day ended successfully" });
+    } catch (error) {
+      console.error("End inventory error:", error);
+      res.status(500).json({ error: "Failed to end inventory day" });
+    }
+  });
+  app2.post("/api/inventory/session/update-time", async (req, res) => {
+    try {
+      const currentStorage = await waitForStorage();
+      const { sessionId, startTime, endTime } = req.body;
+      if (!sessionId) {
+        return res.status(400).json({ error: "Session ID is required" });
+      }
+      const updates = {};
+      if (startTime) {
+        updates.startTime = new Date(startTime);
+      }
+      if (endTime) {
+        updates.endTime = new Date(endTime);
+      }
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: "No time updates provided" });
+      }
+      const updatedSession = await currentStorage.updateInventorySession(sessionId, updates);
+      if (!updatedSession) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      res.json({ session: updatedSession, message: "Session time updated successfully" });
+    } catch (error) {
+      console.error("Update session time error:", error);
+      res.status(500).json({ error: "Failed to update session time" });
+    }
+  });
+  app2.delete("/api/inventory/delete/:date", async (req, res) => {
+    try {
+      const currentStorage = await waitForStorage();
+      const { date } = req.params;
+      if (!date) {
+        return res.status(400).json({ error: "Date is required" });
+      }
+      await currentStorage.clearInventoryByDate(date);
+      res.json({ message: "Inventory data deleted successfully" });
+    } catch (error) {
+      console.error("Delete inventory error:", error);
+      res.status(500).json({ error: "Failed to delete inventory data" });
+    }
+  });
+  app2.patch("/api/inventory/item/:itemId", async (req, res) => {
+    try {
+      const currentStorage = await waitForStorage();
+      const { itemId } = req.params;
+      const { stockIn } = req.body;
+      if (!itemId) {
+        return res.status(400).json({ error: "Item ID is required" });
+      }
+      if (stockIn === void 0 || stockIn === null) {
+        return res.status(400).json({ error: "Stock In value is required" });
+      }
+      const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+      const session = await currentStorage.getInventorySessionByDate(today);
+      if (!session) {
+        return res.status(404).json({ error: "No active session found" });
+      }
+      const currentItems = await currentStorage.getInventoryItemsBySession(session.id);
+      const currentItem = currentItems.find((item) => item.id === itemId);
+      if (!currentItem) {
+        return res.status(404).json({ error: "Inventory item not found" });
+      }
+      const stockLeft = stockIn - currentItem.stockOut;
+      const updatedItem = await currentStorage.updateInventoryItem(itemId, {
+        stockIn,
+        stockLeft
+      });
+      if (!updatedItem) {
+        return res.status(404).json({ error: "Failed to update inventory item" });
+      }
+      res.json({ item: updatedItem, message: "Inventory item updated successfully" });
+    } catch (error) {
+      console.error("Update inventory item error:", error);
+      res.status(500).json({ error: "Failed to update inventory item" });
     }
   });
   const httpServer = createServer(app2);

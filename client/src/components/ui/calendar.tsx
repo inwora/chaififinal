@@ -49,6 +49,7 @@ function Calendar({
         day_range_middle:
           "aria-selected:bg-accent aria-selected:text-accent-foreground",
         day_hidden: "invisible",
+        week_number: "text-xs font-medium text-blue-600 bg-blue-50 rounded px-1 mr-1 hover:bg-blue-100 cursor-pointer",
         ...classNames,
       }}
       components={{

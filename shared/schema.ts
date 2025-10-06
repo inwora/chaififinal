@@ -9,12 +9,20 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
 });
 
+export const categories = pgTable("categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  subCategories: jsonb("sub_categories").default([]), // Array of strings
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
 export const menuItems = pgTable("menu_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description").notNull(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   category: text("category").notNull(),
+  subCategory: text("sub_category"),
   image: text("image").notNull(),
   available: boolean("available").notNull().default(true),
 });
@@ -65,9 +73,33 @@ export const monthlySummaries = pgTable("monthly_summaries", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
+export const inventorySessions = pgTable("inventory_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: text("date").notNull(), // YYYY-MM-DD format
+  status: text("status").notNull(), // 'pre-billing', 'billing', 'ended'
+  startTime: timestamp("start_time").notNull().default(sql`now()`),
+  endTime: timestamp("end_time"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const inventoryItems = pgTable("inventory_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull(),
+  menuItemId: varchar("menu_item_id").notNull(),
+  stockIn: integer("stock_in").notNull(),
+  stockOut: integer("stock_out").notNull().default(0),
+  stockLeft: integer("stock_left").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
+});
+
+export const insertCategorySchema = createInsertSchema(categories).omit({
+  id: true,
+  createdAt: true,
 });
 
 export const insertMenuItemSchema = createInsertSchema(menuItems).omit({
@@ -94,9 +126,22 @@ export const insertMonthlySummarySchema = createInsertSchema(monthlySummaries).o
   createdAt: true,
 });
 
+export const insertInventorySessionSchema = createInsertSchema(inventorySessions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertInventoryItemSchema = createInsertSchema(inventoryItems).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export type Category = typeof categories.$inferSelect;
+export type InsertCategory = z.infer<typeof insertCategorySchema>;
 
 export type MenuItem = typeof menuItems.$inferSelect;
 export type InsertMenuItem = z.infer<typeof insertMenuItemSchema>;
@@ -112,6 +157,12 @@ export type InsertWeeklySummary = z.infer<typeof insertWeeklySummarySchema>;
 
 export type MonthlySummary = typeof monthlySummaries.$inferSelect;
 export type InsertMonthlySummary = z.infer<typeof insertMonthlySummarySchema>;
+
+export type InventorySession = typeof inventorySessions.$inferSelect;
+export type InsertInventorySession = z.infer<typeof insertInventorySessionSchema>;
+
+export type InventoryItem = typeof inventoryItems.$inferSelect;
+export type InsertInventoryItem = z.infer<typeof insertInventoryItemSchema>;
 
 // Cart item type for frontend
 export type CartItem = {

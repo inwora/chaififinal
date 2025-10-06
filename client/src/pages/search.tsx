@@ -20,6 +20,7 @@ export default function SearchPage() {
 
   const { data: menuItems = [], isLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu"],
+    refetchOnMount: true, // Always refetch when component mounts
   });
 
   // Filter items based on search query and category
