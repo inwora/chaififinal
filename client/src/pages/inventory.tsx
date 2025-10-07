@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Download, Play, StopCircle, Edit, Trash2, Check, X, Menu, Trash } from "lucide-react";
+import { ArrowLeft, Download, Play, StopCircle, Edit, Trash2, Check, X, Menu, Trash, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -51,6 +51,8 @@ export default function InventoryPage() {
       if (!response.ok) throw new Error("Failed to fetch session");
       return response.json();
     },
+    refetchOnMount: true, // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 
   // Fetch inventory items for current session
@@ -63,7 +65,8 @@ export default function InventoryPage() {
       return response.json();
     },
     enabled: !!currentSession?.id,
-    refetchInterval: currentSession?.status === 'billing' ? 5000 : false, // Auto-refresh every 5 seconds when billing is active
+    refetchInterval: currentSession?.status === 'billing' ? 10000 : false, // Auto-refresh every 10 seconds when billing is active (reduced frequency)
+    refetchOnMount: true,
   });
 
   // Initialize stock inputs from inventory items
@@ -119,6 +122,11 @@ export default function InventoryPage() {
   const endDayMutation = useMutation({
     mutationFn: async () => {
       if (!currentSession?.id) throw new Error("No active session");
+      
+      // Check if session is already ended
+      if (currentSession.status === 'ended') {
+        throw new Error("Session already ended");
+      }
 
       const response = await fetch("/api/inventory/end", {
         method: "POST",
@@ -214,6 +222,25 @@ export default function InventoryPage() {
 
   const handleGoToMenu = () => {
     navigate("/menu");
+  };
+
+  const handleRefresh = async () => {
+    try {
+      await Promise.all([
+        refetchSession(),
+        refetchItems()
+      ]);
+      toast({
+        title: "Refreshed",
+        description: "Inventory data has been refreshed successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to refresh inventory data.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDownloadPDF = async () => {
@@ -353,6 +380,16 @@ export default function InventoryPage() {
                   <p className="text-[10px] sm:text-xs text-orange-100">{format(new Date(), 'hh:mm a')}</p>
                 </div>
                 <div className="flex flex-1 gap-1.5 sm:gap-2 sm:flex-none sm:gap-3">
+                  <Button
+                    onClick={handleRefresh}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 bg-white text-blue-600 hover:bg-blue-50 border-blue-300 sm:flex-none text-xs sm:text-sm px-2 sm:px-3"
+                    disabled={isLoadingSession || isLoadingItems}
+                  >
+                    <RefreshCw className="mr-1 sm:mr-2" size={14} />
+                    <span className="hidden xs:inline">Refresh</span>
+                  </Button>
                   <Button
                     onClick={handleGoToMenu}
                     variant="outline"

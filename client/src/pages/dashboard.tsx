@@ -211,6 +211,8 @@ export default function DashboardPage() {
         queryClient.invalidateQueries({ queryKey: ["/api/summaries/weekly"] });
         queryClient.invalidateQueries({ queryKey: ["/api/summaries/monthly"] });
         queryClient.invalidateQueries({ queryKey: ["/api/menu/sales"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/inventory/session/current"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/inventory/items"] });
       } else {
         const error = await response.json();
         toast({
@@ -310,6 +312,7 @@ export default function DashboardPage() {
         queryClient.invalidateQueries({ queryKey: ["/api/summaries/monthly"] });
         queryClient.invalidateQueries({ queryKey: ["/api/menu/sales"] });
         queryClient.invalidateQueries({ queryKey: ["/api/inventory/session/current"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/inventory/items"] });
       } else {
         const error = await response.json();
         toast({
@@ -398,6 +401,8 @@ export default function DashboardPage() {
         queryClient.invalidateQueries({ queryKey: ["/api/summaries/weekly"] });
         queryClient.invalidateQueries({ queryKey: ["/api/summaries/monthly"] });
         queryClient.invalidateQueries({ queryKey: ["/api/menu/sales"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/inventory/session/current"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/inventory/items"] });
       } else {
         const error = await response.json();
         toast({
@@ -479,6 +484,8 @@ export default function DashboardPage() {
         queryClient.invalidateQueries({ queryKey: ["/api/summaries/weekly"] });
         queryClient.invalidateQueries({ queryKey: ["/api/summaries/monthly"] });
         queryClient.invalidateQueries({ queryKey: ["/api/menu/sales"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/inventory/session/current"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/inventory/items"] });
       } else {
         const error = await response.json();
         toast({

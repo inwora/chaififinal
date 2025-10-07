@@ -766,26 +766,30 @@ export class MongoStorage implements IStorage {
     const transactions = await this.getTransactionsByDate(date);
     const inventoryItems = await this.getInventoryItemsBySession(sessionId);
     
-    // Calculate stock out for each inventory item
-    for (const inventoryItem of inventoryItems) {
-      let stockOut = 0;
-      
-      // Sum up quantities from all transactions
-      for (const transaction of transactions) {
-        const items = transaction.items as any[];
-        const soldItem = items.find(i => i.id === inventoryItem.menuItemId);
-        if (soldItem) {
-          stockOut += soldItem.quantity;
-        }
+    // Build a map of menuItemId -> total quantity sold for faster lookup
+    const stockOutMap = new Map<string, number>();
+    
+    // Sum up quantities from all transactions
+    for (const transaction of transactions) {
+      const items = transaction.items as any[];
+      for (const item of items) {
+        const currentStockOut = stockOutMap.get(item.id) || 0;
+        stockOutMap.set(item.id, currentStockOut + item.quantity);
       }
-      
-      // Update inventory item
+    }
+    
+    // Update all inventory items in parallel
+    const updatePromises = inventoryItems.map(inventoryItem => {
+      const stockOut = stockOutMap.get(inventoryItem.menuItemId) || 0;
       const stockLeft = inventoryItem.stockIn - stockOut;
-      await this.updateInventoryItem(inventoryItem.id, {
+      return this.updateInventoryItem(inventoryItem.id, {
         stockOut,
         stockLeft,
       });
-    }
+    });
+    
+    // Execute all updates in parallel
+    await Promise.all(updatePromises);
   }
 
   async clearInventoryByDate(date: string): Promise<void> {

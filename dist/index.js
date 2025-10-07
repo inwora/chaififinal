@@ -626,21 +626,23 @@ var MongoStorage = class {
   async calculateStockOutForSession(sessionId, date) {
     const transactions2 = await this.getTransactionsByDate(date);
     const inventoryItems2 = await this.getInventoryItemsBySession(sessionId);
-    for (const inventoryItem of inventoryItems2) {
-      let stockOut = 0;
-      for (const transaction of transactions2) {
-        const items = transaction.items;
-        const soldItem = items.find((i) => i.id === inventoryItem.menuItemId);
-        if (soldItem) {
-          stockOut += soldItem.quantity;
-        }
+    const stockOutMap = /* @__PURE__ */ new Map();
+    for (const transaction of transactions2) {
+      const items = transaction.items;
+      for (const item of items) {
+        const currentStockOut = stockOutMap.get(item.id) || 0;
+        stockOutMap.set(item.id, currentStockOut + item.quantity);
       }
+    }
+    const updatePromises = inventoryItems2.map((inventoryItem) => {
+      const stockOut = stockOutMap.get(inventoryItem.menuItemId) || 0;
       const stockLeft = inventoryItem.stockIn - stockOut;
-      await this.updateInventoryItem(inventoryItem.id, {
+      return this.updateInventoryItem(inventoryItem.id, {
         stockOut,
         stockLeft
       });
-    }
+    });
+    await Promise.all(updatePromises);
   }
   async clearInventoryByDate(date) {
     const inventorySession = await this.getInventorySessionByDate(date);
@@ -1157,21 +1159,23 @@ var MemStorage = class {
   async calculateStockOutForSession(sessionId, date) {
     const transactions2 = await this.getTransactionsByDate(date);
     const inventoryItems2 = await this.getInventoryItemsBySession(sessionId);
-    for (const inventoryItem of inventoryItems2) {
-      let stockOut = 0;
-      for (const transaction of transactions2) {
-        const items = transaction.items;
-        const soldItem = items.find((i) => i.id === inventoryItem.menuItemId);
-        if (soldItem) {
-          stockOut += soldItem.quantity;
-        }
+    const stockOutMap = /* @__PURE__ */ new Map();
+    for (const transaction of transactions2) {
+      const items = transaction.items;
+      for (const item of items) {
+        const currentStockOut = stockOutMap.get(item.id) || 0;
+        stockOutMap.set(item.id, currentStockOut + item.quantity);
       }
+    }
+    const updatePromises = inventoryItems2.map((inventoryItem) => {
+      const stockOut = stockOutMap.get(inventoryItem.menuItemId) || 0;
       const stockLeft = inventoryItem.stockIn - stockOut;
-      await this.updateInventoryItem(inventoryItem.id, {
+      return this.updateInventoryItem(inventoryItem.id, {
         stockOut,
         stockLeft
       });
-    }
+    });
+    await Promise.all(updatePromises);
   }
   async clearInventoryByDate(date) {
     const inventorySession = await this.getInventorySessionByDate(date);
