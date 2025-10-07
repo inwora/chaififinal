@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, Trash2, Save, X, BarChart3, FolderTree, ChevronDown } from "lucide-react";
+import { Plus, Edit, Trash2, Save, X, BarChart3, FolderTree, ChevronDown, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -401,6 +401,15 @@ export default function AdminPage() {
             >
               <BarChart3 size={18} />
               Dashboard
+            </Button>
+            <Button
+              onClick={() => navigate("/menu")}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2 px-4 py-2"
+            >
+              <Menu size={18} />
+              Menu
             </Button>
             <Button
               onClick={() => setShowCategoryManager(!showCategoryManager)}
